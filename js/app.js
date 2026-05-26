@@ -68,7 +68,7 @@ function renderHome() {
     card.innerHTML = `
       <div class="unit-card-emoji">${unit.icon}</div>
       <div class="unit-card-info">
-        <div class="unit-card-label">Unit ${i + 1}</div>
+        <div class="unit-card-label">Unit ${i + 1} · <span class="unit-level-badge">${unit.level}</span></div>
         <div class="unit-card-title">${unit.title}</div>
         <div class="unit-card-subtitle">${unit.subtitle}</div>
       </div>
@@ -104,7 +104,7 @@ function renderUnit(unitId) {
 
   document.getElementById('unit-hero-emoji').textContent = unit.icon;
   document.getElementById('unit-hero-title').textContent = unit.title;
-  document.getElementById('unit-hero-subtitle').textContent = unit.subtitle;
+  document.getElementById('unit-hero-subtitle').textContent = `${unit.subtitle} · ${unit.level}`;
 
   // Grammar tips
   const tipsContainer = document.getElementById('grammar-tips-container');
@@ -232,6 +232,16 @@ function doCheck() {
   const result = submitAnswer(isMatchingDone ? true : answer);
   if (!result) return;
 
+  if (result.nearMiss) {
+    // Almost correct — show hint, let user retry same exercise
+    showFeedback(null, result.correctAnswer, true);
+    const btn = document.getElementById('lesson-action-btn');
+    btn.textContent = 'Try Again';
+    btn.disabled = false;
+    _lessonMode = 'showing_feedback';
+    return;
+  }
+
   showAnswerFeedback(result.correct, result.exercise);
   showFeedback(result.correct, result.correctAnswer);
 
@@ -239,14 +249,21 @@ function doCheck() {
   const btn = document.getElementById('lesson-action-btn');
   btn.textContent = 'Continue';
   btn.disabled = false;
-  btn.className = result.correct
-    ? 'btn btn-primary'
-    : 'btn btn-primary';
 }
 
 function doContinue() {
+  const wasNearMiss = document.getElementById('feedback-inline').classList.contains('near-miss');
   hideFeedback();
   _lessonMode = 'answering';
+
+  if (wasNearMiss) {
+    // Re-render same exercise for retry
+    renderExercise();
+    const btn = document.getElementById('lesson-action-btn');
+    btn.textContent = 'Check';
+    btn.disabled = true;
+    return;
+  }
 
   const hasMore = advance();
   if (hasMore) {
@@ -254,10 +271,7 @@ function doContinue() {
     const btn = document.getElementById('lesson-action-btn');
     btn.textContent = 'Check';
     btn.disabled = true;
-    btn.className = 'btn btn-primary';
   }
-  // If !hasMore, the onComplete callback fires inside advance(),
-  // which navigates to results screen.
 }
 
 function updateProgressBar() {
@@ -266,19 +280,25 @@ function updateProgressBar() {
   document.getElementById('lesson-progress-fill').style.width = pct + '%';
 }
 
-function showFeedback(correct, correctAnswer) {
+function showFeedback(correct, correctAnswer, nearMiss = false) {
   const fb = document.getElementById('feedback-inline');
-  fb.classList.remove('hidden', 'correct', 'incorrect');
-  fb.classList.add(correct ? 'correct' : 'incorrect');
+  fb.classList.remove('hidden', 'correct', 'incorrect', 'near-miss');
 
-  document.getElementById('feedback-label').textContent = correct ? '✓ Correct!' : '✗ Incorrect';
-  document.getElementById('feedback-answer').textContent = correct ? '' : `Correct answer: ${correctAnswer}`;
+  if (nearMiss) {
+    fb.classList.add('near-miss');
+    document.getElementById('feedback-label').textContent = '⚠ Almost!';
+    document.getElementById('feedback-answer').textContent = `Correct spelling: ${correctAnswer}`;
+  } else {
+    fb.classList.add(correct ? 'correct' : 'incorrect');
+    document.getElementById('feedback-label').textContent = correct ? '✓ Correct!' : '✗ Incorrect';
+    document.getElementById('feedback-answer').textContent = correct ? '' : `Correct answer: ${correctAnswer}`;
+  }
 }
 
 function hideFeedback() {
   const fb = document.getElementById('feedback-inline');
   fb.classList.add('hidden');
-  fb.classList.remove('correct', 'incorrect');
+  fb.classList.remove('correct', 'incorrect', 'near-miss');
 }
 
 function showExitModal() {

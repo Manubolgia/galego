@@ -22,6 +22,25 @@ function isMatch(input, correct, accepted = []) {
   return all.includes(n);
 }
 
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 1) return 2; // fast exit
+  let prev = Array.from({length: n + 1}, (_, i) => i);
+  for (let i = 1; i <= m; i++) {
+    const curr = [i];
+    for (let j = 1; j <= n; j++)
+      curr[j] = a[i-1] === b[j-1] ? prev[j-1] : 1 + Math.min(prev[j], curr[j-1], prev[j-1]);
+    prev = curr;
+  }
+  return prev[n];
+}
+
+function isNearMiss(input, correct, accepted = []) {
+  const nIn = normalise(input);
+  const targets = [correct, ...accepted].map(normalise);
+  return nIn.length > 0 && targets.some(t => levenshtein(nIn, t) === 1);
+}
+
 // ── Shuffle ────────────────────────────────────────────────────
 function shuffle(arr) {
   const a = [...arr];
@@ -89,11 +108,19 @@ export function submitAnswer(userAnswer) {
 
   if (correct) {
     _state.correct++;
-  } else {
-    _state.wrong.push({ exercise: ex, userAnswer });
+    return { correct: true, nearMiss: false, correctAnswer: getCorrectDisplay(ex), exercise: ex };
   }
 
-  return { correct, correctAnswer: getCorrectDisplay(ex), exercise: ex };
+  // Near-miss: 1 letter off on typed exercises → retry, not a mistake
+  const typedTypes = ['translate_type', 'fill_blank', 'listening'];
+  if (typedTypes.includes(ex.type) && typeof userAnswer === 'string') {
+    if (isNearMiss(userAnswer, ex.correctAnswer, ex.acceptedAnswers || [])) {
+      return { correct: false, nearMiss: true, correctAnswer: getCorrectDisplay(ex), exercise: ex };
+    }
+  }
+
+  _state.wrong.push({ exercise: ex, userAnswer });
+  return { correct: false, nearMiss: false, correctAnswer: getCorrectDisplay(ex), exercise: ex };
 }
 
 export function advance() {
