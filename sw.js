@@ -1,5 +1,5 @@
 // Galego Service Worker — Cache-first strategy
-const CACHE_NAME = 'galego-v1.2.0';
+const CACHE_NAME = 'galego-v1.3.0';
 
 const PRECACHE_URLS = [
   './index.html',
@@ -15,6 +15,12 @@ const PRECACHE_URLS = [
   './js/data/course.js',
   './js/data/vocabulary.js',
   './js/data/exercises.js',
+  './js/data/exercises_u1u2.js',
+  './js/data/exercises_u3u4.js',
+  './js/data/exercises_u5u6.js',
+  './js/data/exercises_u7u8.js',
+  './js/data/exercises_u9u10.js',
+  './js/data/exercises_u11u12.js',
   './assets/icon-192.png',
   './assets/icon-512.png',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap',
