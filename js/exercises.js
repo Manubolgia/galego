@@ -216,9 +216,8 @@ function renderMC(ex, wrap) {
     btn.className = 'mc-option';
     btn.textContent = opt;
     btn.addEventListener('click', () => {
-      if (selected !== null) return;
-      selected = opt;
       grid.querySelectorAll('.mc-option').forEach(b => b.classList.remove('selected'));
+      selected = opt;
       btn.classList.add('selected');
       enableCheck(true);
       window._currentAnswer = opt;
