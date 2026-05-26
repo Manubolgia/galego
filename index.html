@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Learn Galician from English — a beautiful, offline-capable PWA language learning app.">
+  <title>Galego — Learn Galician</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a6db5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Galego">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/design-system.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/exercises.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- TOP NAV BAR -->
+  <nav id="top-bar" class="hidden">
+    <div class="top-bar-inner">
+      <button id="back-btn" class="top-bar-btn" aria-label="Go back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      <span id="top-bar-title" class="top-bar-title"></span>
+      <div style="width:40px"></div>
+    </div>
+  </nav>
+
+  <!-- HOME SCREEN -->
+  <main id="screen-home" class="screen">
+    <div class="home-header">
+      <span class="home-logo">🌊</span>
+      <h1 class="home-app-name">Galego</h1>
+      <p class="home-subtitle">Learn Galician</p>
+    </div>
+    <div class="home-content">
+      <div class="section-label">Your Course</div>
+      <div id="units-list" class="units-list"></div>
+    </div>
+  </main>
+
+  <!-- UNIT SCREEN -->
+  <main id="screen-unit" class="screen hidden">
+    <div class="screen-content">
+      <div class="unit-screen-header">
+        <span id="unit-hero-emoji" class="unit-hero-emoji"></span>
+        <h2 id="unit-hero-title" class="unit-hero-title"></h2>
+        <p id="unit-hero-subtitle" class="unit-hero-subtitle"></p>
+      </div>
+
+      <div style="padding: 0 var(--space-4);">
+        <div class="section-label">Lessons</div>
+        <div id="lesson-dots" class="lessons-row"></div>
+
+        <button id="unit-start-btn" class="btn btn-primary" style="margin-bottom: var(--space-5);">
+          Start Lesson
+        </button>
+
+        <div class="grammar-section">
+          <div class="grammar-section-title">Grammar Tips</div>
+          <div id="grammar-tips-container"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- LESSON SCREEN -->
+  <main id="screen-lesson" class="screen hidden">
+    <div class="lesson-layout">
+      <!-- Progress bar -->
+      <div class="lesson-top">
+        <button id="exit-lesson-btn" class="top-bar-btn" aria-label="Exit lesson">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+        <div class="lesson-progress-track">
+          <div id="lesson-progress-fill" class="lesson-progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- Exercise area -->
+      <div class="lesson-exercise-area">
+        <div id="exercise-container"></div>
+        <!-- Inline feedback (hidden until answer checked) -->
+        <div id="feedback-inline" class="feedback-inline hidden">
+          <div id="feedback-label" class="feedback-label"></div>
+          <div id="feedback-answer" class="feedback-answer"></div>
+        </div>
+      </div>
+
+      <!-- Bottom button: Check → Continue -->
+      <div class="lesson-bottom">
+        <div class="check-btn-container">
+          <button id="lesson-action-btn" class="btn btn-primary" disabled>Check</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- RESULTS SCREEN -->
+  <main id="screen-results" class="screen hidden">
+    <div class="screen-content">
+      <div class="results-score-section">
+        <div class="score-ring-container">
+          <svg class="score-ring-svg" viewBox="0 0 160 160">
+            <circle class="score-ring-track" cx="80" cy="80" r="65"/>
+            <circle id="score-ring-progress" class="score-ring-progress score-high"
+              cx="80" cy="80" r="65"
+              style="stroke-dashoffset:409.8"/>
+          </svg>
+          <div class="score-ring-inner">
+            <div id="score-number" class="score-number score-high">0%</div>
+          </div>
+        </div>
+        <div id="results-message" class="results-message"></div>
+      </div>
+
+      <div class="results-actions">
+        <button id="continue-btn" class="btn btn-primary">Continue →</button>
+        <button id="retry-btn" class="btn btn-secondary">Retry Lesson</button>
+      </div>
+
+      <div id="mistakes-section" class="mistakes-section">
+        <div class="mistakes-title">Review Mistakes</div>
+        <div id="mistakes-list" class="mistakes-list"></div>
+      </div>
+    </div>
+  </main>
+
+</div>
+
+<!-- Exit confirmation modal -->
+<div id="exit-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-title">Leave lesson?</div>
+    <div class="modal-body">Your progress in this lesson will be lost.</div>
+    <div class="modal-actions">
+      <button id="exit-confirm-btn" class="btn btn-incorrect btn-sm">Leave</button>
+      <button id="exit-cancel-btn" class="btn btn-ghost btn-sm">Keep going</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+</script>
+<script type="module">
+  import { init } from './js/app.js';
+  init();
+</script>
+</body>
+</html>
