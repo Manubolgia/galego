@@ -11,7 +11,7 @@ import {
 } from './exercises.js';
 
 // ── Screen management ──────────────────────────────────────────
-const SCREENS = ['home','unit','lesson','results'];
+const SCREENS = ['home','unit','lesson'];
 
 export function navigate(screenId, params = {}) {
   SCREENS.forEach(id => {
@@ -36,16 +36,13 @@ export function navigate(screenId, params = {}) {
     } else if (screenId === 'lesson') {
       topTitle.textContent = '';
       backBtn.style.visibility = 'hidden';
-    } else if (screenId === 'results') {
-      topTitle.textContent = 'Lesson Complete';
-      backBtn.style.visibility = 'hidden';
     }
   }
 
   if (screenId === 'home') renderHome();
   if (screenId === 'unit' && params.unitId) renderUnit(params.unitId);
   if (screenId === 'lesson' && params.lessonId) initLesson(params.unitId, params.lessonId);
-  if (screenId === 'results' && params.result) renderResults(params.result, params.unitId, params.lessonId);
+
 }
 
 // ── Home screen ────────────────────────────────────────────────
@@ -201,7 +198,7 @@ function initLesson(unitId, lessonId) {
   const ex = startLesson(lessonId, (result) => {
     saveLessonScore(unitId, lessonId, result.score);
     clearCurrentLesson();
-    navigate('results', { result, unitId, lessonId });
+    navigate('unit', { unitId, unit: getUnit(unitId) });
   });
 
   if (!ex) {
@@ -288,59 +285,7 @@ function showExitModal() {
   document.getElementById('exit-modal').classList.remove('hidden');
 }
 
-// ── Results screen ─────────────────────────────────────────────
-function renderResults(result, unitId, lessonId) {
-  const { score, wrong } = result;
 
-  const ring = document.getElementById('score-ring-progress');
-  const scoreNum = document.getElementById('score-number');
-  const msg = document.getElementById('results-message');
-
-  const cls = score >= 90 ? 'score-high' : score >= 70 ? 'score-mid' : 'score-low';
-  const circumference = 409.8;
-  ring.className = `score-ring-progress ${cls}`;
-  scoreNum.className = `score-number ${cls}`;
-
-  // Reset then animate
-  ring.style.strokeDashoffset = circumference;
-  setTimeout(() => {
-    ring.style.strokeDashoffset = circumference - (circumference * score / 100);
-  }, 100);
-
-  let displayed = 0;
-  const interval = setInterval(() => {
-    displayed = Math.min(displayed + 2, score);
-    scoreNum.textContent = displayed + '%';
-    if (displayed >= score) clearInterval(interval);
-  }, 20);
-
-  msg.textContent = score >= 90 ? '🎉 Excellent!' : score >= 70 ? '👍 Good job!' : '💪 Keep practicing!';
-
-  // Mistakes
-  const mistakesList = document.getElementById('mistakes-list');
-  const mistakesSection = document.getElementById('mistakes-section');
-  mistakesList.innerHTML = '';
-
-  if (wrong.length === 0) {
-    mistakesSection.style.display = 'none';
-  } else {
-    mistakesSection.style.display = 'block';
-    wrong.forEach(({ exercise: ex, userAnswer }) => {
-      const card = document.createElement('div');
-      card.className = 'mistake-card';
-      const displayAnswer = Array.isArray(userAnswer) ? userAnswer.join(' ') : userAnswer;
-      const correctDisplay = Array.isArray(ex.correctAnswer) ? ex.correctAnswer.join(' ') : ex.correctAnswer;
-      card.innerHTML = `
-        <div class="mistake-prompt">${ex.prompt}${ex.sentence ? ' "' + ex.sentence + '"' : ''}</div>
-        <div class="mistake-your-answer">✗ ${displayAnswer || '(no answer)'}</div>
-        <div class="mistake-correct-answer">✓ ${correctDisplay}</div>`;
-      mistakesList.appendChild(card);
-    });
-  }
-
-  document.getElementById('retry-btn').onclick = () => navigate('lesson', { unitId, lessonId });
-  document.getElementById('continue-btn').onclick = () => navigate('unit', { unitId, unit: getUnit(unitId) });
-}
 
 // ── Init ───────────────────────────────────────────────────────
 export async function init() {

@@ -7,7 +7,10 @@ let _onComplete = null;
 
 // ── Normalise answers ──────────────────────────────────────────
 function normalise(str) {
-  return str.toLowerCase().trim()
+  return str
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // strip accents
+    .toLowerCase().trim()
+    .replace(/[`\u2018\u2019\u2019]/g, "'")              // normalise apostrophes
     .replace(/\s+/g, ' ')
     .replace(/[¿¡]/g, '')
     .replace(/[.!?,;:]/g, '');
