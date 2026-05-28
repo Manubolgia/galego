@@ -5,15 +5,69 @@ import { speak, isSupported as audioSupported } from './audio.js';
 let _state = null; // { exercises, index, correct, wrong[], answers }
 let _onComplete = null;
 
+// ── Contraction expansion table ────────────────────────────────
+const CONTRACTIONS = [
+  [/\bi'm\b/g, 'i am'],
+  [/\byou're\b/g, 'you are'],
+  [/\bhe's\b/g, 'he is'],
+  [/\bshe's\b/g, 'she is'],
+  [/\bit's\b/g, 'it is'],
+  [/\bwe're\b/g, 'we are'],
+  [/\bthey're\b/g, 'they are'],
+  [/\bdon't\b/g, 'do not'],
+  [/\bdoesn't\b/g, 'does not'],
+  [/\bdidn't\b/g, 'did not'],
+  [/\bcan't\b/g, 'cannot'],
+  [/\bwon't\b/g, 'will not'],
+  [/\bisn't\b/g, 'is not'],
+  [/\baren't\b/g, 'are not'],
+  [/\bwasn't\b/g, 'was not'],
+  [/\bweren't\b/g, 'were not'],
+  [/\blet's\b/g, 'let us'],
+  [/\bthat's\b/g, 'that is'],
+  [/\bthere's\b/g, 'there is'],
+  [/\bwhat's\b/g, 'what is'],
+  [/\bwho's\b/g, 'who is'],
+  [/\bhaven't\b/g, 'have not'],
+  [/\bhasn't\b/g, 'has not'],
+  [/\bwouldn't\b/g, 'would not'],
+  [/\bcouldn't\b/g, 'could not'],
+  [/\bshouldn't\b/g, 'should not'],
+  [/\bi've\b/g, 'i have'],
+  [/\byou've\b/g, 'you have'],
+  [/\bwe've\b/g, 'we have'],
+  [/\bthey've\b/g, 'they have'],
+  [/\bi'll\b/g, 'i will'],
+  [/\byou'll\b/g, 'you will'],
+  [/\bhe'll\b/g, 'he will'],
+  [/\bshe'll\b/g, 'she will'],
+  [/\bit'll\b/g, 'it will'],
+  [/\bwe'll\b/g, 'we will'],
+  [/\bthey'll\b/g, 'they will'],
+  [/\bi'd\b/g, 'i would'],
+  [/\byou'd\b/g, 'you would'],
+  [/\bhe'd\b/g, 'he would'],
+  [/\bshe'd\b/g, 'she would'],
+  [/\bwe'd\b/g, 'we would'],
+  [/\bthey'd\b/g, 'they would'],
+];
+
 // ── Normalise answers ──────────────────────────────────────────
 function normalise(str) {
-  return str
+  let s = str
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // strip accents
     .toLowerCase().trim()
     .replace(/[`\u2018\u2019\u2019]/g, "'")              // normalise apostrophes
     .replace(/\s+/g, ' ')
     .replace(/[¿¡]/g, '')
     .replace(/[.!?,;:]/g, '');
+
+  // Expand contractions so "you're" and "you are" compare equal
+  for (const [pattern, replacement] of CONTRACTIONS) {
+    s = s.replace(pattern, replacement);
+  }
+
+  return s;
 }
 
 function isMatch(input, correct, accepted = []) {

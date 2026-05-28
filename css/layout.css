@@ -166,6 +166,15 @@
   text-transform: uppercase;
 }
 
+.home-header-actions {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 12px) + 12px);
+  right: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .home-content {
   padding: var(--space-4) var(--space-4);
   padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px));

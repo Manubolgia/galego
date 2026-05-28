@@ -43,6 +43,16 @@
       <span class="home-logo">🌊</span>
       <h1 class="home-app-name">Galego</h1>
       <p class="home-subtitle">Learn Galician</p>
+      <!-- Settings & Sync -->
+      <div class="home-header-actions">
+        <button id="sync-indicator" class="sync-indicator hidden" title="Sync status">☁️</button>
+        <button id="settings-btn" class="settings-btn" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.32 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
     </div>
     <div class="home-content">
       <div class="section-label">Your Course</div>
@@ -61,6 +71,7 @@
 
       <div style="padding: 0 var(--space-4);">
         <div class="section-label">Lessons</div>
+        <div class="section-label-hint">Long-press a lesson to mark as done or reset</div>
         <div id="lesson-dots" class="lessons-row"></div>
 
         <button id="unit-start-btn" class="btn btn-primary" style="margin-bottom: var(--space-5);">
@@ -110,8 +121,6 @@
     </div>
   </main>
 
-
-
 </div>
 
 <!-- Exit confirmation modal -->
@@ -122,6 +131,83 @@
     <div class="modal-actions">
       <button id="exit-confirm-btn" class="btn btn-incorrect btn-sm">Leave</button>
       <button id="exit-cancel-btn" class="btn btn-ghost btn-sm">Keep going</button>
+    </div>
+  </div>
+</div>
+
+<!-- Skip-ahead warning modal -->
+<div id="skip-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-icon">⚠️</div>
+    <div class="modal-title">Skip ahead?</div>
+    <div class="modal-body">You haven't completed the previous lessons yet. You might find this content challenging without the earlier foundations.</div>
+    <div class="modal-actions">
+      <button id="skip-confirm-btn" class="btn btn-primary btn-sm">Skip Ahead</button>
+      <button id="skip-cancel-btn" class="btn btn-ghost btn-sm">Go Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- Lesson context menu (long-press on lesson dots) -->
+<div id="lesson-context-menu" class="context-menu hidden">
+  <button id="ctx-mark-done" class="context-menu-item">
+    <span class="context-menu-icon">✓</span>
+    <span>Mark as done</span>
+  </button>
+  <button id="ctx-reset" class="context-menu-item hidden">
+    <span class="context-menu-icon">↩</span>
+    <span>Reset lesson</span>
+  </button>
+</div>
+
+<!-- Settings panel -->
+<div id="settings-panel" class="settings-panel hidden">
+  <div class="settings-panel-inner">
+    <div class="settings-header">
+      <div class="settings-title">Settings</div>
+      <button id="settings-close-btn" class="top-bar-btn" aria-label="Close settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-section-title">☁️ Cloud Sync</div>
+      <div class="settings-section-desc">Sync your progress across devices. Set up once, syncs automatically.</div>
+
+      <div class="settings-field">
+        <label class="settings-label">Status</label>
+        <div id="settings-sync-status" class="settings-sync-status">Not configured</div>
+      </div>
+
+      <div class="settings-field">
+        <label class="settings-label">Firebase Database URL</label>
+        <input id="settings-firebase-url" type="url" class="settings-input" placeholder="https://your-project.firebaseio.com" />
+        <button id="settings-save-firebase" class="btn btn-secondary btn-sm settings-action-btn">Save URL</button>
+      </div>
+
+      <div class="settings-field">
+        <label class="settings-label">Your Sync Code</label>
+        <div class="settings-code-display">
+          <span id="settings-sync-code">Not set</span>
+          <button id="settings-copy-code" class="settings-copy-btn">Copy</button>
+        </div>
+        <div class="settings-code-actions">
+          <button id="settings-generate-code" class="btn btn-secondary btn-sm settings-action-btn">Generate New Code</button>
+        </div>
+      </div>
+
+      <div class="settings-field">
+        <label class="settings-label">Or enter an existing code</label>
+        <div class="settings-code-input-row">
+          <input id="settings-sync-code-input" type="text" class="settings-input" placeholder="galego-mar-sol-42" />
+          <button id="settings-use-code" class="btn btn-primary btn-sm settings-action-btn">Use Code</button>
+        </div>
+      </div>
+
+      <button id="settings-sync-now" class="btn btn-primary btn-sm settings-action-btn" style="margin-top: var(--space-3);">Sync Now</button>
     </div>
   </div>
 </div>

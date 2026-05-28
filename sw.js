@@ -1,5 +1,5 @@
 // Galego Service Worker — Cache-first strategy
-const CACHE_NAME = 'galego-v1.3.0';
+const CACHE_NAME = 'galego-v2.0.0';
 
 const PRECACHE_URLS = [
   './index.html',
@@ -56,6 +56,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   // Don't intercept POST requests or non-GET
   if (event.request.method !== 'GET') return;
+
+  // Don't cache Firebase API calls
+  if (event.request.url.includes('firebaseio.com')) return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {

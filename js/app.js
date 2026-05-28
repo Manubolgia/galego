@@ -2,8 +2,12 @@
 import { COURSE, getUnit } from './data/course.js';
 import { init as initAudio } from './audio.js';
 import {
-  isLessonUnlocked, isLessonCompleted, getLessonScore,
-  getUnitProgress, saveLessonScore, clearCurrentLesson
+  isLessonRecommended, isLessonCompleted, getLessonScore,
+  getUnitProgress, saveLessonScore, clearCurrentLesson,
+  isUnitRecommended, markLessonDone, resetLesson,
+  isFirebaseConfigured, getSyncCode, createSyncCode,
+  setSyncCode, setupFirebase, syncNow, getFirebaseUrl,
+  onSyncStatus, initSync,
 } from './state.js';
 import {
   startLesson, getProgress, submitAnswer, advance,
@@ -39,6 +43,10 @@ export function navigate(screenId, params = {}) {
     }
   }
 
+  // Close any open popovers
+  hideContextMenu();
+  hideSettingsPanel();
+
   if (screenId === 'home') renderHome();
   if (screenId === 'unit' && params.unitId) renderUnit(params.unitId);
   if (screenId === 'lesson' && params.lessonId) initLesson(params.unitId, params.lessonId);
@@ -52,11 +60,10 @@ function renderHome() {
 
   COURSE.forEach((unit, i) => {
     const prog = getUnitProgress(unit.id, COURSE);
-    const prevProg = i > 0 ? getUnitProgress(COURSE[i-1].id, COURSE) : null;
-    const isLocked = i > 0 && prevProg && prevProg.percentage < 100;
+    const recommended = isUnitRecommended(unit.id, COURSE);
 
     const card = document.createElement('div');
-    card.className = `unit-card${isLocked ? ' locked' : ''}`;
+    card.className = `unit-card${!recommended ? ' not-recommended' : ''}`;
     card.style.animationDelay = `${i * 60}ms`;
     card.setAttribute('role', 'button');
     card.setAttribute('aria-label', unit.title);
@@ -73,26 +80,24 @@ function renderHome() {
         <div class="unit-card-subtitle">${unit.subtitle}</div>
       </div>
       <div class="unit-card-progress">
-        ${isLocked ? `
-          <div class="unit-card-lock">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-            </svg>
-          </div>` : `
-          <div class="progress-ring">
-            <svg viewBox="0 0 44 44">
-              <circle class="progress-ring-track" cx="22" cy="22" r="20.2"/>
-              <circle class="progress-ring-fill${pct===100?' complete':''}" cx="22" cy="22" r="20.2"
-                style="stroke-dashoffset:${offset}"/>
-            </svg>
-            <div class="progress-ring-text">${pct===100?'✓':pct>0?pct+'%':prog.completed+'/'+prog.total}</div>
-          </div>`}
+        <div class="progress-ring">
+          <svg viewBox="0 0 44 44">
+            <circle class="progress-ring-track" cx="22" cy="22" r="20.2"/>
+            <circle class="progress-ring-fill${pct===100?' complete':''}" cx="22" cy="22" r="20.2"
+              style="stroke-dashoffset:${offset}"/>
+          </svg>
+          <div class="progress-ring-text">${pct===100?'✓':pct>0?pct+'%':prog.completed+'/'+prog.total}</div>
+        </div>
       </div>`;
 
-    if (!isLocked) {
-      card.addEventListener('click', () => navigate('unit', { unitId: unit.id, unit }));
-    }
+    // All units are always clickable — skip-ahead warning for non-recommended units
+    card.addEventListener('click', () => {
+      if (!recommended) {
+        showSkipWarning(() => navigate('unit', { unitId: unit.id, unit }));
+      } else {
+        navigate('unit', { unitId: unit.id, unit });
+      }
+    });
     list.appendChild(card);
   });
 }
@@ -137,7 +142,7 @@ function renderUnit(unitId) {
   const dotsContainer = document.getElementById('lesson-dots');
   dotsContainer.innerHTML = '';
   unit.lessons.forEach((lessonId, i) => {
-    const unlocked = isLessonUnlocked(unitId, lessonId, COURSE);
+    const recommended = isLessonRecommended(unitId, lessonId, COURSE);
     const completed = isLessonCompleted(unitId, lessonId);
     const score = getLessonScore(unitId, lessonId);
 
@@ -147,20 +152,72 @@ function renderUnit(unitId) {
     const dot = document.createElement('button');
     dot.setAttribute('aria-label', `Lesson ${i + 1}`);
 
-    if (!unlocked) {
-      dot.className = 'lesson-dot locked';
-      dot.innerHTML = `<svg class="lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
-    } else if (completed && score) {
-      const cls = score.score >= 90 ? 'score-high' : score.score >= 70 ? 'score-mid' : 'score-low';
-      dot.className = `lesson-dot completed ${cls}`;
-      dot.textContent = score.score + '%';
-      dot.addEventListener('click', () => navigate('lesson', { unitId, lessonId }));
+    if (completed && score) {
+      if (score.manual) {
+        // Manually completed — distinct style
+        dot.className = 'lesson-dot completed manual';
+        dot.textContent = '✓';
+      } else {
+        const cls = score.score >= 90 ? 'score-high' : score.score >= 70 ? 'score-mid' : 'score-low';
+        dot.className = `lesson-dot completed ${cls}`;
+        dot.textContent = score.score + '%';
+      }
+    } else if (!recommended) {
+      // Not recommended but still accessible
+      dot.className = 'lesson-dot available not-recommended';
+      dot.textContent = i + 1;
     } else {
       dot.className = 'lesson-dot available';
       dot.textContent = i + 1;
-      dot.addEventListener('click', () => navigate('lesson', { unitId, lessonId }));
     }
+
+    // All lessons are clickable
+    dot.addEventListener('click', () => {
+      if (!recommended && !completed) {
+        showSkipWarning(() => navigate('lesson', { unitId, lessonId }));
+      } else {
+        navigate('lesson', { unitId, lessonId });
+      }
+    });
+
+    // Long-press for context menu (mark-as-done / reset)
+    let longPressTimer = null;
+    let longPressTriggered = false;
+
+    const startLongPress = (e) => {
+      longPressTriggered = false;
+      longPressTimer = setTimeout(() => {
+        longPressTriggered = true;
+        e.preventDefault();
+        showContextMenu(dot, unitId, lessonId, completed);
+      }, 700);
+    };
+
+    const cancelLongPress = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    };
+
+    const endLongPress = (e) => {
+      cancelLongPress();
+      if (longPressTriggered) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    dot.addEventListener('touchstart', startLongPress, { passive: false });
+    dot.addEventListener('touchend', endLongPress);
+    dot.addEventListener('touchmove', cancelLongPress);
+    dot.addEventListener('touchcancel', cancelLongPress);
+
+    // Desktop: right-click for context menu
+    dot.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      showContextMenu(dot, unitId, lessonId, completed);
+    });
 
     const label = document.createElement('div');
     label.className = 'lesson-dot-label';
@@ -171,16 +228,235 @@ function renderUnit(unitId) {
     dotsContainer.appendChild(wrapper);
   });
 
-  // Start button — first available lesson
-  const firstAvail = unit.lessons.find(lid => isLessonUnlocked(unitId, lid, COURSE));
+  // Start button — first available (not completed) lesson, or first lesson
+  const firstNotDone = unit.lessons.find(lid => !isLessonCompleted(unitId, lid));
+  const targetLesson = firstNotDone || unit.lessons[0];
   const startBtn = document.getElementById('unit-start-btn');
-  if (firstAvail) {
-    startBtn.disabled = false;
-    startBtn.textContent = isLessonCompleted(unitId, firstAvail) ? 'Practice Again' : 'Start Lesson';
-    startBtn.onclick = () => navigate('lesson', { unitId, lessonId: firstAvail });
+  startBtn.disabled = false;
+  startBtn.textContent = firstNotDone ? 'Start Lesson' : 'Practice Again';
+  startBtn.onclick = () => navigate('lesson', { unitId, lessonId: targetLesson });
+}
+
+// ── Context menu (long-press on lesson dots) ───────────────────
+function showContextMenu(dotEl, unitId, lessonId, isCompleted) {
+  hideContextMenu();
+
+  const menu = document.getElementById('lesson-context-menu');
+  const markBtn = document.getElementById('ctx-mark-done');
+  const resetBtn = document.getElementById('ctx-reset');
+
+  if (isCompleted) {
+    markBtn.classList.add('hidden');
+    resetBtn.classList.remove('hidden');
   } else {
-    startBtn.disabled = true;
-    startBtn.textContent = 'Locked';
+    markBtn.classList.remove('hidden');
+    resetBtn.classList.add('hidden');
+  }
+
+  // Position menu near the dot
+  const rect = dotEl.getBoundingClientRect();
+  menu.style.top = `${rect.bottom + 8}px`;
+  menu.style.left = `${Math.max(8, Math.min(rect.left + rect.width / 2 - 80, window.innerWidth - 168))}px`;
+  menu.classList.remove('hidden');
+
+  // Haptic feedback on mobile
+  if (navigator.vibrate) navigator.vibrate(30);
+
+  markBtn.onclick = () => {
+    markLessonDone(unitId, lessonId);
+    hideContextMenu();
+    renderUnit(unitId);
+  };
+
+  resetBtn.onclick = () => {
+    resetLesson(unitId, lessonId);
+    hideContextMenu();
+    renderUnit(unitId);
+  };
+
+  // Close on outside click (delayed to prevent immediate trigger)
+  setTimeout(() => {
+    document.addEventListener('click', _closeContextOnOutside);
+    document.addEventListener('touchstart', _closeContextOnOutside);
+  }, 100);
+}
+
+function _closeContextOnOutside(e) {
+  const menu = document.getElementById('lesson-context-menu');
+  if (menu && !menu.contains(e.target)) {
+    hideContextMenu();
+  }
+}
+
+function hideContextMenu() {
+  const menu = document.getElementById('lesson-context-menu');
+  if (menu) menu.classList.add('hidden');
+  document.removeEventListener('click', _closeContextOnOutside);
+  document.removeEventListener('touchstart', _closeContextOnOutside);
+}
+
+// ── Skip-ahead warning ─────────────────────────────────────────
+function showSkipWarning(onConfirm) {
+  const modal = document.getElementById('skip-modal');
+  modal.classList.remove('hidden');
+
+  document.getElementById('skip-confirm-btn').onclick = () => {
+    modal.classList.add('hidden');
+    onConfirm();
+  };
+  document.getElementById('skip-cancel-btn').onclick = () => {
+    modal.classList.add('hidden');
+  };
+}
+
+// ── Settings panel ─────────────────────────────────────────────
+function showSettingsPanel() {
+  const panel = document.getElementById('settings-panel');
+  panel.classList.remove('hidden');
+
+  const firebaseInput = document.getElementById('settings-firebase-url');
+  const syncCodeDisplay = document.getElementById('settings-sync-code');
+  const syncStatus = document.getElementById('settings-sync-status');
+  const syncCodeInput = document.getElementById('settings-sync-code-input');
+
+  firebaseInput.value = getFirebaseUrl();
+
+  const code = getSyncCode();
+  if (code) {
+    syncCodeDisplay.textContent = code;
+    syncCodeInput.value = code;
+  } else {
+    syncCodeDisplay.textContent = 'Not set';
+    syncCodeInput.value = '';
+  }
+
+  syncStatus.textContent = isFirebaseConfigured() && code ? 'Configured' : 'Not configured';
+  syncStatus.className = `settings-sync-status ${isFirebaseConfigured() && code ? 'active' : ''}`;
+}
+
+function hideSettingsPanel() {
+  const panel = document.getElementById('settings-panel');
+  if (panel) panel.classList.add('hidden');
+}
+
+function setupSettingsListeners() {
+  // Gear button
+  document.getElementById('settings-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const panel = document.getElementById('settings-panel');
+    if (panel.classList.contains('hidden')) {
+      showSettingsPanel();
+    } else {
+      hideSettingsPanel();
+    }
+  });
+
+  // Close button
+  document.getElementById('settings-close-btn').addEventListener('click', () => {
+    hideSettingsPanel();
+  });
+
+  // Generate new sync code
+  document.getElementById('settings-generate-code').addEventListener('click', () => {
+    const code = createSyncCode();
+    document.getElementById('settings-sync-code').textContent = code;
+    document.getElementById('settings-sync-code-input').value = code;
+    updateSyncStatusUI();
+  });
+
+  // Use existing code
+  document.getElementById('settings-use-code').addEventListener('click', () => {
+    const input = document.getElementById('settings-sync-code-input');
+    const code = input.value.trim();
+    if (code.length < 3) {
+      input.classList.add('error');
+      setTimeout(() => input.classList.remove('error'), 1500);
+      return;
+    }
+    setSyncCode(code);
+    document.getElementById('settings-sync-code').textContent = code;
+    updateSyncStatusUI();
+    // Pull from cloud with new code
+    if (isFirebaseConfigured()) {
+      syncNow().then(() => {
+        navigate('home'); // refresh UI with synced data
+      });
+    }
+  });
+
+  // Copy sync code
+  document.getElementById('settings-copy-code').addEventListener('click', () => {
+    const code = getSyncCode();
+    if (code) {
+      navigator.clipboard.writeText(code).then(() => {
+        const btn = document.getElementById('settings-copy-code');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+      }).catch(() => {
+        // Fallback
+        const input = document.getElementById('settings-sync-code-input');
+        input.select();
+        document.execCommand('copy');
+      });
+    }
+  });
+
+  // Save Firebase URL
+  document.getElementById('settings-save-firebase').addEventListener('click', () => {
+    const input = document.getElementById('settings-firebase-url');
+    const url = input.value.trim();
+    if (url) {
+      setupFirebase(url);
+      updateSyncStatusUI();
+      // If we have a code, sync now
+      if (getSyncCode()) {
+        syncNow().then(() => {
+          navigate('home');
+        });
+      }
+    }
+  });
+
+  // Sync now button
+  document.getElementById('settings-sync-now').addEventListener('click', async () => {
+    const btn = document.getElementById('settings-sync-now');
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
+    try {
+      await syncNow();
+      navigate('home');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sync Now';
+    }
+  });
+
+  // Listen for sync status changes
+  onSyncStatus((status, message) => {
+    const indicator = document.getElementById('sync-indicator');
+    if (indicator) {
+      indicator.className = `sync-indicator ${status}`;
+      indicator.textContent = status === 'synced' ? '☁️' : status === 'syncing' ? '⟳' : '⚠';
+      indicator.title = message;
+    }
+    const settingsStatus = document.getElementById('settings-sync-status');
+    if (settingsStatus && !document.getElementById('settings-panel').classList.contains('hidden')) {
+      settingsStatus.textContent = message;
+      settingsStatus.className = `settings-sync-status ${status}`;
+    }
+  });
+}
+
+function updateSyncStatusUI() {
+  const syncStatus = document.getElementById('settings-sync-status');
+  const configured = isFirebaseConfigured() && getSyncCode();
+  syncStatus.textContent = configured ? 'Configured' : 'Not configured';
+  syncStatus.className = `settings-sync-status ${configured ? 'active' : ''}`;
+
+  // Show/hide sync indicator in home header
+  const indicator = document.getElementById('sync-indicator');
+  if (indicator) {
+    indicator.classList.toggle('hidden', !configured);
   }
 }
 
@@ -305,7 +581,8 @@ function showExitModal() {
   document.getElementById('exit-modal').classList.remove('hidden');
 }
 
-
+// Need to import renderExercise for retry logic
+import { renderExercise } from './exercises.js';
 
 // ── Init ───────────────────────────────────────────────────────
 export async function init() {
@@ -319,6 +596,11 @@ export async function init() {
   document.getElementById('exit-cancel-btn').onclick = () => {
     document.getElementById('exit-modal').classList.add('hidden');
   };
+
+  setupSettingsListeners();
+
+  // Initialize sync
+  await initSync();
 
   navigate('home');
 }
