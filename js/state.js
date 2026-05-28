@@ -2,6 +2,7 @@
 // GALEGO — State Manager
 // localStorage persistence for progress and mid-lesson state
 // Firebase Realtime Database sync via REST API
+// Clipboard-based transfer for zero-config sync
 // =====================================================
 
 const STATE_KEY = 'galego_state_v2';
@@ -114,6 +115,8 @@ async function _pushToCloud() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+      cache: 'no-store',
+      mode: 'cors',
     });
     if (res.ok) {
       console.log('Galego: Push successful');
@@ -121,11 +124,17 @@ async function _pushToCloud() {
     } else {
       const text = await res.text().catch(() => '');
       console.warn('Galego: Push failed', res.status, text);
-      _notifySyncStatus('error', `Sync failed (${res.status})`);
+      if (res.status === 401) {
+        _notifySyncStatus('error', 'Permission denied — check Firebase rules');
+      } else if (res.status === 404) {
+        _notifySyncStatus('error', 'Database not found — check URL');
+      } else {
+        _notifySyncStatus('error', `Sync failed (${res.status})`);
+      }
     }
   } catch (e) {
-    console.warn('Galego: Cloud sync failed', e);
-    _notifySyncStatus('error', 'Offline');
+    console.warn('Galego: Cloud sync failed', e.message || e);
+    _notifySyncStatus('error', `Offline — ${e.message || 'network error'}`);
   }
 }
 
@@ -138,13 +147,20 @@ async function _pullFromCloud() {
     _notifySyncStatus('syncing', 'Loading…');
     const endpoint = `${url}/progress/${code}.json`;
     console.log('Galego: Pulling from', endpoint);
-    const res = await fetch(endpoint);
+    const res = await fetch(endpoint, {
+      cache: 'no-store',
+      mode: 'cors',
+    });
 
     if (!res.ok) {
       // 404 means no data at this path — that's normal for new sync codes
       if (res.status === 404) {
         console.log('Galego: No cloud data yet (404), pushing local data');
         await _pushToCloud();
+        return;
+      }
+      if (res.status === 401) {
+        _notifySyncStatus('error', 'Permission denied — check Firebase rules');
         return;
       }
       const text = await res.text().catch(() => '');
@@ -167,8 +183,8 @@ async function _pullFromCloud() {
       await _pushToCloud();
     }
   } catch (e) {
-    console.warn('Galego: Cloud pull failed', e);
-    _notifySyncStatus('error', 'Offline');
+    console.warn('Galego: Cloud pull failed', e.message || e);
+    _notifySyncStatus('error', `Offline — ${e.message || 'network error'}`);
   }
 }
 
@@ -232,6 +248,167 @@ export async function syncNow() {
 
 export function getFirebaseUrl() {
   return _getFirebaseUrl() || '';
+}
+
+// ── Test Firebase connection ─────────────────────────────────
+export async function testFirebaseConnection() {
+  const url = _getFirebaseUrl();
+  if (!url) {
+    return { ok: false, message: 'No Firebase URL configured' };
+  }
+
+  // Validate URL format
+  if (!url.startsWith('https://')) {
+    return { ok: false, message: 'URL must start with https://' };
+  }
+  if (!url.includes('firebaseio.com') && !url.includes('firebasedatabase.app')) {
+    return { ok: false, message: 'URL doesn\'t look like a Firebase Realtime Database URL' };
+  }
+
+  const steps = [];
+
+  // Step 1: Test basic connectivity
+  try {
+    steps.push('Testing connectivity…');
+    const testEndpoint = `${url}/.json?shallow=true`;
+    console.log('Galego: Testing connection to', testEndpoint);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    const res = await fetch(testEndpoint, {
+      cache: 'no-store',
+      mode: 'cors',
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (res.status === 401) {
+      steps.push('⚠ Root access denied (401) — this is normal if rules restrict root');
+    } else if (res.ok) {
+      steps.push('✓ Database reachable');
+    } else {
+      steps.push(`✗ Got HTTP ${res.status}`);
+      return { ok: false, message: steps.join('\n'), status: res.status };
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      steps.push('✗ Connection timed out (8s)');
+    } else {
+      steps.push(`✗ Network error: ${e.message}`);
+    }
+    return { ok: false, message: steps.join('\n') };
+  }
+
+  // Step 2: Test write to a test path
+  try {
+    steps.push('Testing write access…');
+    const testPath = `${url}/progress/_connection_test.json`;
+    const res = await fetch(testPath, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ test: true, at: new Date().toISOString() }),
+      cache: 'no-store',
+      mode: 'cors',
+    });
+
+    if (res.ok) {
+      steps.push('✓ Write access works');
+    } else if (res.status === 401) {
+      steps.push('✗ Write denied (401) — update Firebase security rules');
+      steps.push('  Rules should allow read/write under /progress/');
+      return { ok: false, message: steps.join('\n') };
+    } else {
+      steps.push(`✗ Write failed (${res.status})`);
+      return { ok: false, message: steps.join('\n') };
+    }
+  } catch (e) {
+    steps.push(`✗ Write error: ${e.message}`);
+    return { ok: false, message: steps.join('\n') };
+  }
+
+  // Step 3: Test read
+  try {
+    steps.push('Testing read access…');
+    const testPath = `${url}/progress/_connection_test.json`;
+    const res = await fetch(testPath, {
+      cache: 'no-store',
+      mode: 'cors',
+    });
+    if (res.ok) {
+      steps.push('✓ Read access works');
+    } else {
+      steps.push(`✗ Read failed (${res.status})`);
+      return { ok: false, message: steps.join('\n') };
+    }
+  } catch (e) {
+    steps.push(`✗ Read error: ${e.message}`);
+    return { ok: false, message: steps.join('\n') };
+  }
+
+  steps.push('✓ All tests passed — Firebase is ready!');
+  return { ok: true, message: steps.join('\n') };
+}
+
+// ── Clipboard-based progress transfer ────────────────────────
+export function exportProgress() {
+  _ensureLoaded();
+  const data = {
+    v: 2,
+    s: _state.lessonScores,
+    t: new Date().toISOString(),
+  };
+  try {
+    const json = JSON.stringify(data);
+    // Use base64 encoding for a compact, pasteable string
+    const encoded = btoa(unescape(encodeURIComponent(json)));
+    return `GALEGO:${encoded}`;
+  } catch (e) {
+    console.warn('Galego: Export failed', e);
+    return null;
+  }
+}
+
+export function importProgress(encoded) {
+  if (!encoded || typeof encoded !== 'string') {
+    return { ok: false, message: 'No data provided' };
+  }
+
+  // Strip prefix
+  let base64 = encoded.trim();
+  if (base64.startsWith('GALEGO:')) {
+    base64 = base64.slice(7);
+  }
+
+  try {
+    const json = decodeURIComponent(escape(atob(base64)));
+    const data = JSON.parse(json);
+
+    if (!data || !data.s) {
+      return { ok: false, message: 'Invalid data format' };
+    }
+
+    _ensureLoaded();
+
+    const importedCount = Object.keys(data.s).length;
+    const beforeCount = Object.keys(_state.lessonScores).length;
+
+    // Merge imported scores with local
+    _mergeScores(data.s);
+    _save();
+
+    const afterCount = Object.keys(_state.lessonScores).length;
+    const newLessons = afterCount - beforeCount;
+    const exportTime = data.t ? new Date(data.t).toLocaleString() : 'unknown';
+
+    return {
+      ok: true,
+      message: `Imported ${importedCount} lessons (${newLessons} new). Exported at ${exportTime}`,
+    };
+  } catch (e) {
+    console.warn('Galego: Import failed', e);
+    return { ok: false, message: 'Invalid transfer code — make sure you copied the full text' };
+  }
 }
 
 // === PROGRESS API ===

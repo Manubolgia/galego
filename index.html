@@ -173,48 +173,131 @@
       </button>
     </div>
 
+    <!-- SECTION 1: Quick Transfer (no setup needed) -->
     <div class="settings-section">
-      <div class="settings-section-title">☁️ Cloud Sync</div>
-      <div class="settings-section-desc">Sync your progress across devices. Set up once, syncs automatically.</div>
+      <div class="settings-section-title">📋 Transfer Progress</div>
+      <div class="settings-section-desc">Copy your progress and paste it on another device. No accounts or setup needed.</div>
 
-      <div class="settings-field">
-        <label class="settings-label">Status</label>
-        <div id="settings-sync-status" class="settings-sync-status">Not configured</div>
+      <div class="transfer-actions">
+        <button id="transfer-export-btn" class="btn btn-secondary btn-sm transfer-btn">
+          <span class="transfer-btn-icon">📤</span>
+          Export Progress
+        </button>
+        <button id="transfer-import-btn" class="btn btn-secondary btn-sm transfer-btn">
+          <span class="transfer-btn-icon">📥</span>
+          Import Progress
+        </button>
       </div>
 
-      <div class="settings-field">
-        <label class="settings-label">Firebase Database URL</label>
-        <input id="settings-firebase-url" type="url" class="settings-input settings-input-lg" placeholder="https://your-project.firebaseio.com" />
-        <button id="settings-save-firebase" class="btn btn-secondary btn-sm settings-action-btn">Save URL</button>
+      <!-- Export result (shows the transfer code) -->
+      <div id="transfer-export-result" class="transfer-result hidden">
+        <div class="transfer-result-label">Your transfer code:</div>
+        <textarea id="transfer-export-text" class="transfer-textarea" readonly rows="3"></textarea>
+        <button id="transfer-copy-btn" class="btn btn-primary btn-sm transfer-copy-btn">Copy to Clipboard</button>
       </div>
 
-      <div class="settings-field">
-        <label class="settings-label">Your Sync Code</label>
-        <div class="settings-code-display">
-          <span id="settings-sync-code">Not set</span>
-          <button id="settings-copy-code" class="settings-copy-btn">Copy</button>
+      <!-- Import form -->
+      <div id="transfer-import-form" class="transfer-result hidden">
+        <div class="transfer-result-label">Paste transfer code from the other device:</div>
+        <textarea id="transfer-import-text" class="transfer-textarea" rows="3" placeholder="GALEGO:eyJ2Ijo..."></textarea>
+        <button id="transfer-do-import-btn" class="btn btn-primary btn-sm transfer-copy-btn">Import</button>
+      </div>
+
+      <!-- Status messages -->
+      <div id="transfer-status" class="transfer-status hidden"></div>
+    </div>
+
+    <!-- SECTION 2: Cloud Sync (requires Firebase) -->
+    <div class="settings-section">
+      <button id="cloud-sync-toggle" class="settings-section-toggle">
+        <div>
+          <div class="settings-section-title">☁️ Cloud Sync</div>
+          <div class="settings-section-desc" style="margin-bottom: 0;">Auto-sync with Firebase (requires setup)</div>
         </div>
-        <div class="settings-code-actions">
-          <button id="settings-generate-code" class="btn btn-secondary btn-sm settings-action-btn">Generate New Code</button>
+        <svg class="settings-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+
+      <div id="cloud-sync-content" class="settings-collapsible hidden">
+        <div class="settings-field">
+          <label class="settings-label">Status</label>
+          <div id="settings-sync-status" class="settings-sync-status">Not configured</div>
         </div>
-      </div>
 
-      <div class="settings-field">
-        <label class="settings-label">Or enter an existing code</label>
-        <input id="settings-sync-code-input" type="text" class="settings-input settings-input-lg" placeholder="galego-mar-sol-42" />
-        <button id="settings-use-code" class="btn btn-primary btn-sm settings-action-btn">Use Code</button>
-      </div>
+        <div class="settings-field">
+          <label class="settings-label">Firebase Database URL</label>
+          <input id="settings-firebase-url" type="url" class="settings-input settings-input-lg" placeholder="https://your-project.firebasedatabase.app" />
+          <div class="settings-btn-row">
+            <button id="settings-save-firebase" class="btn btn-secondary btn-sm settings-action-btn">Save URL</button>
+            <button id="settings-test-connection" class="btn btn-ghost btn-sm settings-action-btn">Test Connection</button>
+          </div>
+        </div>
 
-      <button id="settings-sync-now" class="btn btn-primary btn-sm settings-action-btn" style="margin-top: var(--space-3);">Sync Now</button>
+        <!-- Test connection output -->
+        <div id="connection-test-output" class="connection-test-output hidden"></div>
+
+        <div class="settings-field">
+          <label class="settings-label">Your Sync Code</label>
+          <div class="settings-code-display">
+            <span id="settings-sync-code">Not set</span>
+            <button id="settings-copy-code" class="settings-copy-btn">Copy</button>
+          </div>
+          <div class="settings-code-actions">
+            <button id="settings-generate-code" class="btn btn-secondary btn-sm settings-action-btn">Generate New Code</button>
+          </div>
+        </div>
+
+        <div class="settings-field">
+          <label class="settings-label">Or enter an existing code</label>
+          <input id="settings-sync-code-input" type="text" class="settings-input settings-input-lg" placeholder="galego-mar-sol-42" />
+          <button id="settings-use-code" class="btn btn-primary btn-sm settings-action-btn">Use Code</button>
+        </div>
+
+        <button id="settings-sync-now" class="btn btn-primary btn-sm settings-action-btn" style="margin-top: var(--space-3);">Sync Now</button>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-  // Register service worker
+  // Force-unregister old service workers, then register the new one
+  // This is the nuclear option to fix stale SW issues
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    window.addEventListener('load', async () => {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const reg of registrations) {
+          // If there's a waiting worker, tell it to skip waiting
+          if (reg.waiting) {
+            reg.waiting.postMessage('skipWaiting');
+          }
+          // If the active worker is an old version, unregister and re-register
+          if (reg.active) {
+            const swUrl = new URL(reg.active.scriptURL);
+            // Always try to update
+            try { await reg.update(); } catch (_) {}
+          }
+        }
+        // Register (or re-register) the current SW
+        const newReg = await navigator.serviceWorker.register('./sw.js');
+        // If a new SW is waiting after registration, activate it
+        if (newReg.waiting) {
+          newReg.waiting.postMessage('skipWaiting');
+        }
+        newReg.addEventListener('updatefound', () => {
+          const newWorker = newReg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                newWorker.postMessage('skipWaiting');
+              }
+            });
+          }
+        });
+      } catch (e) {
+        console.warn('Galego: SW registration issue', e);
+      }
     });
   }
 </script>

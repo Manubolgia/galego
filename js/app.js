@@ -7,7 +7,8 @@ import {
   isUnitRecommended, markLessonDone, resetLesson,
   isFirebaseConfigured, getSyncCode, createSyncCode,
   setSyncCode, setupFirebase, syncNow, getFirebaseUrl,
-  onSyncStatus, initSync,
+  onSyncStatus, initSync, testFirebaseConnection,
+  exportProgress, importProgress,
 } from './state.js';
 import {
   startLesson, getProgress, submitAnswer, advance,
@@ -345,6 +346,18 @@ function showSettingsPanel() {
     syncStatus.textContent = _lastSyncMessage || 'Configured';
     syncStatus.className = `settings-sync-status ${_lastSyncStatus}`;
   }
+
+  // Reset transfer UI state
+  document.getElementById('transfer-export-result').classList.add('hidden');
+  document.getElementById('transfer-import-form').classList.add('hidden');
+  document.getElementById('transfer-status').classList.add('hidden');
+  document.getElementById('connection-test-output').classList.add('hidden');
+
+  // Auto-expand cloud sync if already configured
+  if (configured) {
+    document.getElementById('cloud-sync-content').classList.remove('hidden');
+    document.getElementById('cloud-sync-toggle').querySelector('.settings-chevron').style.transform = 'rotate(180deg)';
+  }
 }
 
 function hideSettingsPanel() {
@@ -368,6 +381,89 @@ function setupSettingsListeners() {
   document.getElementById('settings-close-btn').addEventListener('click', () => {
     hideSettingsPanel();
   });
+
+  // ── Transfer listeners ──────────────────────────────────────
+
+  // Export
+  document.getElementById('transfer-export-btn').addEventListener('click', () => {
+    const code = exportProgress();
+    if (code) {
+      document.getElementById('transfer-export-text').value = code;
+      document.getElementById('transfer-export-result').classList.remove('hidden');
+      document.getElementById('transfer-import-form').classList.add('hidden');
+      document.getElementById('transfer-status').classList.add('hidden');
+    }
+  });
+
+  // Copy transfer code
+  document.getElementById('transfer-copy-btn').addEventListener('click', () => {
+    const text = document.getElementById('transfer-export-text').value;
+    const btn = document.getElementById('transfer-copy-btn');
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.textContent = 'Copy to Clipboard';
+          btn.classList.remove('copied');
+        }, 2000);
+      }).catch(() => {
+        // Fallback: select the textarea
+        document.getElementById('transfer-export-text').select();
+        document.execCommand('copy');
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => { btn.textContent = 'Copy to Clipboard'; }, 2000);
+      });
+    } else {
+      document.getElementById('transfer-export-text').select();
+      document.execCommand('copy');
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = 'Copy to Clipboard'; }, 2000);
+    }
+  });
+
+  // Show import form
+  document.getElementById('transfer-import-btn').addEventListener('click', () => {
+    document.getElementById('transfer-import-form').classList.remove('hidden');
+    document.getElementById('transfer-export-result').classList.add('hidden');
+    document.getElementById('transfer-status').classList.add('hidden');
+    document.getElementById('transfer-import-text').value = '';
+    document.getElementById('transfer-import-text').focus();
+  });
+
+  // Do import
+  document.getElementById('transfer-do-import-btn').addEventListener('click', () => {
+    const text = document.getElementById('transfer-import-text').value;
+    const statusEl = document.getElementById('transfer-status');
+
+    const result = importProgress(text);
+    statusEl.classList.remove('hidden');
+
+    if (result.ok) {
+      statusEl.textContent = `✓ ${result.message}`;
+      statusEl.className = 'transfer-status success';
+      document.getElementById('transfer-import-form').classList.add('hidden');
+      // Refresh the home screen
+      setTimeout(() => navigate('home'), 500);
+    } else {
+      statusEl.textContent = `✗ ${result.message}`;
+      statusEl.className = 'transfer-status error';
+    }
+  });
+
+  // ── Cloud sync toggle ───────────────────────────────────────
+
+  document.getElementById('cloud-sync-toggle').addEventListener('click', () => {
+    const content = document.getElementById('cloud-sync-content');
+    const chevron = document.getElementById('cloud-sync-toggle').querySelector('.settings-chevron');
+    const isHidden = content.classList.contains('hidden');
+
+    content.classList.toggle('hidden');
+    chevron.style.transform = isHidden ? 'rotate(180deg)' : '';
+  });
+
+  // ── Firebase / Cloud sync listeners ─────────────────────────
 
   // Generate new sync code
   document.getElementById('settings-generate-code').addEventListener('click', () => {
@@ -427,6 +523,37 @@ function setupSettingsListeners() {
           navigate('home');
         });
       }
+    }
+  });
+
+  // Test connection
+  document.getElementById('settings-test-connection').addEventListener('click', async () => {
+    const btn = document.getElementById('settings-test-connection');
+    const output = document.getElementById('connection-test-output');
+
+    // Save URL first if not saved
+    const urlInput = document.getElementById('settings-firebase-url');
+    const url = urlInput.value.trim();
+    if (url) {
+      setupFirebase(url);
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Testing…';
+    output.classList.remove('hidden');
+    output.textContent = 'Running diagnostics…';
+    output.className = 'connection-test-output';
+
+    try {
+      const result = await testFirebaseConnection();
+      output.textContent = result.message;
+      output.className = `connection-test-output ${result.ok ? 'success' : 'error'}`;
+    } catch (e) {
+      output.textContent = `Error: ${e.message}`;
+      output.className = 'connection-test-output error';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Test Connection';
     }
   });
 

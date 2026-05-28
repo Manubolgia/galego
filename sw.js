@@ -1,5 +1,5 @@
 // Galego Service Worker — Cache-first strategy
-const CACHE_NAME = 'galego-v2.1.0';
+const CACHE_NAME = 'galego-v2.2.0';
 
 const PRECACHE_URLS = [
   './index.html',
@@ -26,11 +26,11 @@ const PRECACHE_URLS = [
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap',
 ];
 
+// ── Install ──────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(PRECACHE_URLS.map(url => {
-        // For Google Fonts, just try to cache; don't fail install if it doesn't work
         return new Request(url, { mode: 'cors' });
       })).catch(() => {
         // Retry without cross-origin fonts if it fails
@@ -41,6 +41,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
+// ── Activate — purge old caches ──────────────────────────────
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -53,14 +54,22 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// ── Message handler — allow app to force-activate ────────────
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') {
+    self.skipWaiting();
+  }
+});
+
+// ── Fetch — cache same-origin + fonts, pass everything else ──
 self.addEventListener('fetch', (event) => {
-  // Don't intercept POST/PUT requests
+  // Never intercept non-GET requests (PUT/POST/DELETE go to network)
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
 
   // Only cache same-origin requests and Google Fonts
-  // Everything else (Firebase API, etc.) goes straight to network
+  // ALL external API calls (Firebase, etc.) go straight to network untouched
   const isSameOrigin = url.origin === self.location.origin;
   const isGoogleFonts = url.hostname.includes('googleapis.com') || url.hostname.includes('gstatic.com');
 
