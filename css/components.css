@@ -893,6 +893,13 @@
   border-color: var(--color-primary-400);
 }
 
+.settings-input-lg {
+  padding: var(--space-4) var(--space-4);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.01em;
+}
+
 .settings-input.error {
   border-color: var(--color-red-400);
   animation: shake 400ms ease;
