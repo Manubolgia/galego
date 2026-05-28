@@ -17,6 +17,10 @@ import {
 // ── Screen management ──────────────────────────────────────────
 const SCREENS = ['home','unit','lesson'];
 
+// Track sync status globally
+let _lastSyncStatus = 'idle';
+let _lastSyncMessage = '';
+
 export function navigate(screenId, params = {}) {
   SCREENS.forEach(id => {
     const el = document.getElementById(`screen-${id}`);
@@ -330,8 +334,17 @@ function showSettingsPanel() {
     syncCodeInput.value = '';
   }
 
-  syncStatus.textContent = isFirebaseConfigured() && code ? 'Configured' : 'Not configured';
-  syncStatus.className = `settings-sync-status ${isFirebaseConfigured() && code ? 'active' : ''}`;
+  const configured = isFirebaseConfigured() && code;
+  if (!configured) {
+    syncStatus.textContent = 'Not configured';
+    syncStatus.className = 'settings-sync-status';
+  } else if (_lastSyncStatus === 'idle') {
+    syncStatus.textContent = 'Configured — not yet synced';
+    syncStatus.className = 'settings-sync-status active';
+  } else {
+    syncStatus.textContent = _lastSyncMessage || 'Configured';
+    syncStatus.className = `settings-sync-status ${_lastSyncStatus}`;
+  }
 }
 
 function hideSettingsPanel() {
@@ -433,12 +446,16 @@ function setupSettingsListeners() {
 
   // Listen for sync status changes
   onSyncStatus((status, message) => {
+    _lastSyncStatus = status;
+    _lastSyncMessage = message;
+
     const indicator = document.getElementById('sync-indicator');
     if (indicator) {
       indicator.className = `sync-indicator ${status}`;
       indicator.textContent = status === 'synced' ? '☁️' : status === 'syncing' ? '⟳' : '⚠';
       indicator.title = message;
     }
+    // Always update settings panel status if visible
     const settingsStatus = document.getElementById('settings-sync-status');
     if (settingsStatus && !document.getElementById('settings-panel').classList.contains('hidden')) {
       settingsStatus.textContent = message;
@@ -450,8 +467,17 @@ function setupSettingsListeners() {
 function updateSyncStatusUI() {
   const syncStatus = document.getElementById('settings-sync-status');
   const configured = isFirebaseConfigured() && getSyncCode();
-  syncStatus.textContent = configured ? 'Configured' : 'Not configured';
-  syncStatus.className = `settings-sync-status ${configured ? 'active' : ''}`;
+
+  if (!configured) {
+    syncStatus.textContent = 'Not configured';
+    syncStatus.className = 'settings-sync-status';
+  } else if (_lastSyncStatus === 'idle' || _lastSyncStatus === 'synced') {
+    syncStatus.textContent = _lastSyncMessage || 'Configured';
+    syncStatus.className = `settings-sync-status ${_lastSyncStatus === 'synced' ? 'synced' : 'active'}`;
+  } else {
+    syncStatus.textContent = _lastSyncMessage || 'Configured';
+    syncStatus.className = `settings-sync-status ${_lastSyncStatus}`;
+  }
 
   // Show/hide sync indicator in home header
   const indicator = document.getElementById('sync-indicator');

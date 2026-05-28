@@ -1,5 +1,5 @@
 // Galego Service Worker — Cache-first strategy
-const CACHE_NAME = 'galego-v2.0.0';
+const CACHE_NAME = 'galego-v2.1.0';
 
 const PRECACHE_URLS = [
   './index.html',
@@ -54,11 +54,17 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Don't intercept POST requests or non-GET
+  // Don't intercept POST/PUT requests
   if (event.request.method !== 'GET') return;
 
-  // Don't cache Firebase API calls
-  if (event.request.url.includes('firebaseio.com')) return;
+  const url = new URL(event.request.url);
+
+  // Only cache same-origin requests and Google Fonts
+  // Everything else (Firebase API, etc.) goes straight to network
+  const isSameOrigin = url.origin === self.location.origin;
+  const isGoogleFonts = url.hostname.includes('googleapis.com') || url.hostname.includes('gstatic.com');
+
+  if (!isSameOrigin && !isGoogleFonts) return;
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
@@ -75,7 +81,7 @@ self.addEventListener('fetch', (event) => {
         return response;
       }).catch(() => {
         // Offline fallback for HTML pages
-        if (event.request.headers.get('accept').includes('text/html')) {
+        if (event.request.headers.get('accept')?.includes('text/html')) {
           return caches.match('./index.html');
         }
       });

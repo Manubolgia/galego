@@ -108,15 +108,20 @@ async function _pushToCloud() {
       lastSyncAt: new Date().toISOString(),
       version: 2,
     };
-    const res = await fetch(`${url}/progress/${encodeURIComponent(code)}.json`, {
+    const endpoint = `${url}/progress/${code}.json`;
+    console.log('Galego: Pushing to', endpoint);
+    const res = await fetch(endpoint, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
     if (res.ok) {
-      _notifySyncStatus('synced', 'Synced');
+      console.log('Galego: Push successful');
+      _notifySyncStatus('synced', 'Synced ✓');
     } else {
-      _notifySyncStatus('error', 'Sync failed');
+      const text = await res.text().catch(() => '');
+      console.warn('Galego: Push failed', res.status, text);
+      _notifySyncStatus('error', `Sync failed (${res.status})`);
     }
   } catch (e) {
     console.warn('Galego: Cloud sync failed', e);
@@ -131,19 +136,34 @@ async function _pullFromCloud() {
 
   try {
     _notifySyncStatus('syncing', 'Loading…');
-    const res = await fetch(`${url}/progress/${encodeURIComponent(code)}.json`);
+    const endpoint = `${url}/progress/${code}.json`;
+    console.log('Galego: Pulling from', endpoint);
+    const res = await fetch(endpoint);
+
     if (!res.ok) {
-      _notifySyncStatus('error', 'Sync failed');
+      // 404 means no data at this path — that's normal for new sync codes
+      if (res.status === 404) {
+        console.log('Galego: No cloud data yet (404), pushing local data');
+        await _pushToCloud();
+        return;
+      }
+      const text = await res.text().catch(() => '');
+      console.warn('Galego: Pull failed', res.status, text);
+      _notifySyncStatus('error', `Sync failed (${res.status})`);
       return;
     }
+
     const data = await res.json();
+    console.log('Galego: Pull response:', data);
+
     if (data && data.lessonScores) {
       _mergeScores(data.lessonScores);
       _save(); // save merged result locally (won't re-push because we clear timer)
       if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
-      _notifySyncStatus('synced', 'Synced');
+      _notifySyncStatus('synced', 'Synced ✓');
     } else {
-      // No cloud data yet — push local data up
+      // null or empty — No cloud data yet, push local data up
+      console.log('Galego: Cloud data is empty/null, pushing local data');
       await _pushToCloud();
     }
   } catch (e) {
