@@ -115,6 +115,18 @@
   padding-top: 0;
 }
 
+/* Login screen — no topbar, centered vertically */
+#screen-login {
+  padding-top: 0;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(
+    180deg,
+    var(--color-ocean-900) 0%,
+    var(--color-bg) 100%
+  );
+}
+
 /* === HOME SCREEN LAYOUT === */
 .home-header {
   padding: calc(env(safe-area-inset-top, 20px) + 28px) var(--space-6) var(--space-8);

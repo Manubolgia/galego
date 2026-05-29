@@ -1,0 +1,10 @@
+name = "galego-sync"
+main = "galego-sync-worker.js"
+compatibility_date = "2024-01-01"
+
+# KV Namespace — create it first with:
+#   npx wrangler kv namespace create GALEGO_KV
+# Then paste the id below
+[[kv_namespaces]]
+binding = "GALEGO_KV"
+id = "YOUR_KV_NAMESPACE_ID_HERE"

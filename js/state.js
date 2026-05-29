@@ -1,13 +1,15 @@
 // =====================================================
 // GALEGO — State Manager
 // localStorage persistence for progress and mid-lesson state
-// Firebase Realtime Database sync via REST API
-// Clipboard-based transfer for zero-config sync
+// Cloud sync via Cloudflare Worker (login-based)
+// Clipboard-based transfer as backup
 // =====================================================
 
 const STATE_KEY = 'galego_state_v2';
-const SYNC_CODE_KEY = 'galego_sync_code';
-const FIREBASE_URL_KEY = 'galego_firebase_url';
+const SESSION_KEY = 'galego_session';
+
+// ── IMPORTANT: Set this to your deployed Worker URL ──
+const SYNC_API_URL = 'https://galego-sync.manuobelleiro00.workers.dev/';
 
 const DEFAULT_STATE = {
   lessonScores: {},         // "unit-1/lesson-1": { score, completedAt, attempts }
@@ -16,22 +18,8 @@ const DEFAULT_STATE = {
 
 let _state = null;
 let _syncDebounceTimer = null;
-let _firebaseUrl = null;
-let _syncCode = null;
-let _syncListeners = [];  // callbacks for sync status updates
-
-// ── Firebase config ──────────────────────────────────────────
-function _getFirebaseUrl() {
-  if (_firebaseUrl) return _firebaseUrl;
-  _firebaseUrl = localStorage.getItem(FIREBASE_URL_KEY) || null;
-  return _firebaseUrl;
-}
-
-function _getSyncCode() {
-  if (_syncCode) return _syncCode;
-  _syncCode = localStorage.getItem(SYNC_CODE_KEY) || null;
-  return _syncCode;
-}
+let _session = null;   // { username, passwordHash }
+let _syncListeners = [];
 
 // ── Sync status notifications ────────────────────────────────
 function _notifySyncStatus(status, message) {
@@ -45,18 +33,38 @@ export function onSyncStatus(callback) {
   };
 }
 
-// ── Generate a human-readable sync code ──────────────────────
-function _generateSyncCode() {
-  const words = [
-    'mar', 'sol', 'lua', 'vento', 'chuvia', 'monte', 'rio',
-    'peixe', 'gato', 'can', 'flor', 'bosque', 'pedra', 'estrela',
-    'nube', 'area', 'onda', 'lume', 'ferro', 'ouro', 'prata',
-    'terra', 'ceo', 'neve', 'luz', 'mel', 'sal', 'pan'
-  ];
-  const w1 = words[Math.floor(Math.random() * words.length)];
-  const w2 = words[Math.floor(Math.random() * words.length)];
-  const num = Math.floor(Math.random() * 100);
-  return `galego-${w1}-${w2}-${num}`;
+// ── SHA-256 hashing ──────────────────────────────────────────
+async function _hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── Session management ───────────────────────────────────────
+function _loadSession() {
+  if (_session) return _session;
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (raw) {
+      _session = JSON.parse(raw);
+      return _session;
+    }
+  } catch (e) {
+    console.warn('Galego: Failed to load session', e);
+  }
+  return null;
+}
+
+function _saveSession(username, passwordHash) {
+  _session = { username, passwordHash };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(_session));
+}
+
+function _clearSession() {
+  _session = null;
+  localStorage.removeItem(SESSION_KEY);
 }
 
 // ── Local storage ────────────────────────────────────────────
@@ -81,7 +89,7 @@ function _load() {
 function _save() {
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify(_state));
-    _debouncedCloudSync();
+    _debouncedCloudSave();
   } catch (e) {
     console.warn('Galego: Failed to save state', e);
   }
@@ -91,100 +99,83 @@ function _ensureLoaded() {
   if (!_state) _load();
 }
 
-// ── Firebase REST sync ───────────────────────────────────────
-function _debouncedCloudSync() {
+// ── Cloud sync (Worker API) ──────────────────────────────────
+function _debouncedCloudSave() {
   if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
   _syncDebounceTimer = setTimeout(() => _pushToCloud(), 2000);
 }
 
 async function _pushToCloud() {
-  const url = _getFirebaseUrl();
-  const code = _getSyncCode();
-  if (!url || !code) return;
+  const session = _loadSession();
+  if (!session) return;
 
   try {
-    _notifySyncStatus('syncing', 'Syncing…');
-    const payload = {
-      lessonScores: _state.lessonScores,
-      lastSyncAt: new Date().toISOString(),
-      version: 2,
-    };
-    const endpoint = `${url}/progress/${code}.json`;
-    console.log('Galego: Pushing to', endpoint);
-    const res = await fetch(endpoint, {
-      method: 'PUT',
+    _notifySyncStatus('syncing', 'Saving…');
+    const res = await fetch(`${SYNC_API_URL}/save`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      cache: 'no-store',
-      mode: 'cors',
+      body: JSON.stringify({
+        username: session.username,
+        passwordHash: session.passwordHash,
+        data: {
+          lessonScores: _state.lessonScores,
+          lastSyncAt: new Date().toISOString(),
+        },
+      }),
     });
+
     if (res.ok) {
-      console.log('Galego: Push successful');
-      _notifySyncStatus('synced', 'Synced ✓');
+      _notifySyncStatus('synced', 'Saved ✓');
+    } else if (res.status === 401) {
+      _notifySyncStatus('error', 'Session expired');
     } else {
-      const text = await res.text().catch(() => '');
-      console.warn('Galego: Push failed', res.status, text);
-      if (res.status === 401) {
-        _notifySyncStatus('error', 'Permission denied — check Firebase rules');
-      } else if (res.status === 404) {
-        _notifySyncStatus('error', 'Database not found — check URL');
-      } else {
-        _notifySyncStatus('error', `Sync failed (${res.status})`);
-      }
+      _notifySyncStatus('error', `Save failed (${res.status})`);
     }
   } catch (e) {
-    console.warn('Galego: Cloud sync failed', e.message || e);
-    _notifySyncStatus('error', `Offline — ${e.message || 'network error'}`);
+    console.warn('Galego: Cloud save failed', e.message || e);
+    _notifySyncStatus('error', 'Offline — saved locally');
   }
 }
 
 async function _pullFromCloud() {
-  const url = _getFirebaseUrl();
-  const code = _getSyncCode();
-  if (!url || !code) return;
+  const session = _loadSession();
+  if (!session) return;
 
   try {
     _notifySyncStatus('syncing', 'Loading…');
-    const endpoint = `${url}/progress/${code}.json`;
-    console.log('Galego: Pulling from', endpoint);
-    const res = await fetch(endpoint, {
-      cache: 'no-store',
-      mode: 'cors',
+    const res = await fetch(`${SYNC_API_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: session.username,
+        passwordHash: session.passwordHash,
+      }),
     });
 
     if (!res.ok) {
-      // 404 means no data at this path — that's normal for new sync codes
-      if (res.status === 404) {
-        console.log('Galego: No cloud data yet (404), pushing local data');
-        await _pushToCloud();
-        return;
-      }
       if (res.status === 401) {
-        _notifySyncStatus('error', 'Permission denied — check Firebase rules');
+        _notifySyncStatus('error', 'Session expired');
         return;
       }
-      const text = await res.text().catch(() => '');
-      console.warn('Galego: Pull failed', res.status, text);
       _notifySyncStatus('error', `Sync failed (${res.status})`);
       return;
     }
 
-    const data = await res.json();
-    console.log('Galego: Pull response:', data);
+    const { progress } = await res.json();
 
-    if (data && data.lessonScores) {
-      _mergeScores(data.lessonScores);
-      _save(); // save merged result locally (won't re-push because we clear timer)
+    if (progress && progress.lessonScores) {
+      _mergeScores(progress.lessonScores);
+      // Save merged result locally without re-pushing
+      localStorage.setItem(STATE_KEY, JSON.stringify(_state));
       if (_syncDebounceTimer) clearTimeout(_syncDebounceTimer);
       _notifySyncStatus('synced', 'Synced ✓');
     } else {
-      // null or empty — No cloud data yet, push local data up
-      console.log('Galego: Cloud data is empty/null, pushing local data');
+      // No cloud data yet — push local data up
       await _pushToCloud();
     }
   } catch (e) {
     console.warn('Galego: Cloud pull failed', e.message || e);
-    _notifySyncStatus('error', `Offline — ${e.message || 'network error'}`);
+    _notifySyncStatus('error', 'Offline — using local data');
   }
 }
 
@@ -215,30 +206,68 @@ function _mergeScores(cloudScores) {
   }
 }
 
-// ── PUBLIC: Firebase setup ───────────────────────────────────
-export function setupFirebase(firebaseUrl) {
-  _firebaseUrl = firebaseUrl.replace(/\/$/, '');
-  localStorage.setItem(FIREBASE_URL_KEY, _firebaseUrl);
+// ── PUBLIC: Login / Logout / Auth ────────────────────────────
+
+/**
+ * Log in with username and password.
+ * On first login for a username, the account is auto-created.
+ * Returns { ok, error?, progress? }
+ */
+export async function login(username, password) {
+  if (!username || !password) {
+    return { ok: false, error: 'Please enter username and password' };
+  }
+
+  const cleanUsername = username.trim().toLowerCase();
+  const passwordHash = await _hashPassword(password);
+
+  try {
+    const res = await fetch(`${SYNC_API_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: cleanUsername, passwordHash }),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        return { ok: false, error: 'Wrong password' };
+      }
+      return { ok: false, error: data.error || 'Login failed' };
+    }
+
+    // Save session
+    _saveSession(cleanUsername, passwordHash);
+
+    // Merge cloud progress with local
+    _ensureLoaded();
+    if (data.progress && data.progress.lessonScores) {
+      _mergeScores(data.progress.lessonScores);
+    }
+
+    // Push merged data back to cloud
+    _save();
+
+    return { ok: true };
+  } catch (e) {
+    console.warn('Galego: Login failed', e);
+    return { ok: false, error: 'Network error — check your connection' };
+  }
 }
 
-export function isFirebaseConfigured() {
-  return !!_getFirebaseUrl();
+export function logout() {
+  _clearSession();
+  _notifySyncStatus('idle', '');
 }
 
-export function getSyncCode() {
-  return _getSyncCode();
+export function isLoggedIn() {
+  return !!_loadSession();
 }
 
-export function createSyncCode() {
-  const code = _generateSyncCode();
-  _syncCode = code;
-  localStorage.setItem(SYNC_CODE_KEY, code);
-  return code;
-}
-
-export function setSyncCode(code) {
-  _syncCode = code.trim().toLowerCase();
-  localStorage.setItem(SYNC_CODE_KEY, _syncCode);
+export function getUsername() {
+  const session = _loadSession();
+  return session ? session.username : null;
 }
 
 export async function syncNow() {
@@ -246,111 +275,7 @@ export async function syncNow() {
   await _pullFromCloud();
 }
 
-export function getFirebaseUrl() {
-  return _getFirebaseUrl() || '';
-}
-
-// ── Test Firebase connection ─────────────────────────────────
-export async function testFirebaseConnection() {
-  const url = _getFirebaseUrl();
-  if (!url) {
-    return { ok: false, message: 'No Firebase URL configured' };
-  }
-
-  // Validate URL format
-  if (!url.startsWith('https://')) {
-    return { ok: false, message: 'URL must start with https://' };
-  }
-  if (!url.includes('firebaseio.com') && !url.includes('firebasedatabase.app')) {
-    return { ok: false, message: 'URL doesn\'t look like a Firebase Realtime Database URL' };
-  }
-
-  const steps = [];
-
-  // Step 1: Test basic connectivity
-  try {
-    steps.push('Testing connectivity…');
-    const testEndpoint = `${url}/.json?shallow=true`;
-    console.log('Galego: Testing connection to', testEndpoint);
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-
-    const res = await fetch(testEndpoint, {
-      cache: 'no-store',
-      mode: 'cors',
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-
-    if (res.status === 401) {
-      steps.push('⚠ Root access denied (401) — this is normal if rules restrict root');
-    } else if (res.ok) {
-      steps.push('✓ Database reachable');
-    } else {
-      steps.push(`✗ Got HTTP ${res.status}`);
-      return { ok: false, message: steps.join('\n'), status: res.status };
-    }
-  } catch (e) {
-    if (e.name === 'AbortError') {
-      steps.push('✗ Connection timed out (8s)');
-    } else {
-      steps.push(`✗ Network error: ${e.message}`);
-    }
-    return { ok: false, message: steps.join('\n') };
-  }
-
-  // Step 2: Test write to a test path
-  try {
-    steps.push('Testing write access…');
-    const testPath = `${url}/progress/_connection_test.json`;
-    const res = await fetch(testPath, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ test: true, at: new Date().toISOString() }),
-      cache: 'no-store',
-      mode: 'cors',
-    });
-
-    if (res.ok) {
-      steps.push('✓ Write access works');
-    } else if (res.status === 401) {
-      steps.push('✗ Write denied (401) — update Firebase security rules');
-      steps.push('  Rules should allow read/write under /progress/');
-      return { ok: false, message: steps.join('\n') };
-    } else {
-      steps.push(`✗ Write failed (${res.status})`);
-      return { ok: false, message: steps.join('\n') };
-    }
-  } catch (e) {
-    steps.push(`✗ Write error: ${e.message}`);
-    return { ok: false, message: steps.join('\n') };
-  }
-
-  // Step 3: Test read
-  try {
-    steps.push('Testing read access…');
-    const testPath = `${url}/progress/_connection_test.json`;
-    const res = await fetch(testPath, {
-      cache: 'no-store',
-      mode: 'cors',
-    });
-    if (res.ok) {
-      steps.push('✓ Read access works');
-    } else {
-      steps.push(`✗ Read failed (${res.status})`);
-      return { ok: false, message: steps.join('\n') };
-    }
-  } catch (e) {
-    steps.push(`✗ Read error: ${e.message}`);
-    return { ok: false, message: steps.join('\n') };
-  }
-
-  steps.push('✓ All tests passed — Firebase is ready!');
-  return { ok: true, message: steps.join('\n') };
-}
-
-// ── Clipboard-based progress transfer ────────────────────────
+// ── Clipboard-based progress transfer (backup) ──────────────
 export function exportProgress() {
   _ensureLoaded();
   const data = {
@@ -564,7 +489,7 @@ export function resetProgress() {
 // ── Init sync on load ────────────────────────────────────────
 export async function initSync() {
   _ensureLoaded();
-  if (_getFirebaseUrl() && _getSyncCode()) {
+  if (isLoggedIn()) {
     await _pullFromCloud();
   }
 }

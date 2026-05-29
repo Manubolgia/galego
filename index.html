@@ -37,15 +37,41 @@
     </div>
   </nav>
 
+  <!-- LOGIN SCREEN -->
+  <main id="screen-login" class="screen hidden">
+    <div class="login-screen">
+      <div class="login-card">
+        <div class="login-header">
+          <span class="login-logo">🌊</span>
+          <h1 class="login-title">Galego</h1>
+          <p class="login-subtitle">Learn Galician</p>
+        </div>
+        <div class="login-form">
+          <div class="login-field">
+            <label class="login-label" for="login-username">Username</label>
+            <input id="login-username" type="text" class="login-input" placeholder="Your name" autocomplete="username" autocapitalize="off" spellcheck="false" />
+          </div>
+          <div class="login-field">
+            <label class="login-label" for="login-password">Password</label>
+            <input id="login-password" type="password" class="login-input" placeholder="Your password" autocomplete="current-password" />
+          </div>
+          <div id="login-error" class="login-error hidden"></div>
+          <button id="login-btn" class="btn btn-primary login-btn">Log In</button>
+          <p class="login-hint">First time? Just pick a username and password — your account is created automatically.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
   <!-- HOME SCREEN -->
-  <main id="screen-home" class="screen">
+  <main id="screen-home" class="screen hidden">
     <div class="home-header">
       <span class="home-logo">🌊</span>
       <h1 class="home-app-name">Galego</h1>
       <p class="home-subtitle">Learn Galician</p>
       <!-- Settings & Sync -->
       <div class="home-header-actions">
-        <button id="sync-indicator" class="sync-indicator hidden" title="Sync status">☁️</button>
+        <button id="sync-indicator" class="sync-indicator" title="Sync status">☁️</button>
         <button id="settings-btn" class="settings-btn" aria-label="Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
@@ -173,88 +199,60 @@
       </button>
     </div>
 
-    <!-- SECTION 1: Quick Transfer (no setup needed) -->
+    <!-- SECTION 1: Account -->
     <div class="settings-section">
-      <div class="settings-section-title">📋 Transfer Progress</div>
-      <div class="settings-section-desc">Copy your progress and paste it on another device. No accounts or setup needed.</div>
-
-      <div class="transfer-actions">
-        <button id="transfer-export-btn" class="btn btn-secondary btn-sm transfer-btn">
-          <span class="transfer-btn-icon">📤</span>
-          Export Progress
-        </button>
-        <button id="transfer-import-btn" class="btn btn-secondary btn-sm transfer-btn">
-          <span class="transfer-btn-icon">📥</span>
-          Import Progress
-        </button>
+      <div class="settings-section-title">👤 Account</div>
+      <div class="settings-account-info">
+        <div class="settings-account-user">
+          <span class="settings-account-label">Logged in as</span>
+          <span id="settings-username" class="settings-account-name">—</span>
+        </div>
+        <div id="settings-sync-status" class="settings-sync-status">Synced ✓</div>
       </div>
-
-      <!-- Export result (shows the transfer code) -->
-      <div id="transfer-export-result" class="transfer-result hidden">
-        <div class="transfer-result-label">Your transfer code:</div>
-        <textarea id="transfer-export-text" class="transfer-textarea" readonly rows="3"></textarea>
-        <button id="transfer-copy-btn" class="btn btn-primary btn-sm transfer-copy-btn">Copy to Clipboard</button>
-      </div>
-
-      <!-- Import form -->
-      <div id="transfer-import-form" class="transfer-result hidden">
-        <div class="transfer-result-label">Paste transfer code from the other device:</div>
-        <textarea id="transfer-import-text" class="transfer-textarea" rows="3" placeholder="GALEGO:eyJ2Ijo..."></textarea>
-        <button id="transfer-do-import-btn" class="btn btn-primary btn-sm transfer-copy-btn">Import</button>
-      </div>
-
-      <!-- Status messages -->
-      <div id="transfer-status" class="transfer-status hidden"></div>
+      <button id="settings-sync-now" class="btn btn-secondary btn-sm settings-action-btn">Sync Now</button>
+      <button id="settings-logout-btn" class="btn btn-ghost btn-sm settings-action-btn">Log Out</button>
     </div>
 
-    <!-- SECTION 2: Cloud Sync (requires Firebase) -->
+    <!-- SECTION 2: Transfer Progress (backup) -->
     <div class="settings-section">
-      <button id="cloud-sync-toggle" class="settings-section-toggle">
+      <button id="transfer-toggle" class="settings-section-toggle">
         <div>
-          <div class="settings-section-title">☁️ Cloud Sync</div>
-          <div class="settings-section-desc" style="margin-bottom: 0;">Auto-sync with Firebase (requires setup)</div>
+          <div class="settings-section-title">📋 Transfer Progress</div>
+          <div class="settings-section-desc" style="margin-bottom: 0;">Manual backup — copy & paste between devices</div>
         </div>
         <svg class="settings-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="6 9 12 15 18 9"></polyline>
         </svg>
       </button>
 
-      <div id="cloud-sync-content" class="settings-collapsible hidden">
-        <div class="settings-field">
-          <label class="settings-label">Status</label>
-          <div id="settings-sync-status" class="settings-sync-status">Not configured</div>
+      <div id="transfer-content" class="settings-collapsible hidden">
+        <div class="transfer-actions">
+          <button id="transfer-export-btn" class="btn btn-secondary btn-sm transfer-btn">
+            <span class="transfer-btn-icon">📤</span>
+            Export Progress
+          </button>
+          <button id="transfer-import-btn" class="btn btn-secondary btn-sm transfer-btn">
+            <span class="transfer-btn-icon">📥</span>
+            Import Progress
+          </button>
         </div>
 
-        <div class="settings-field">
-          <label class="settings-label">Firebase Database URL</label>
-          <input id="settings-firebase-url" type="url" class="settings-input settings-input-lg" placeholder="https://your-project.firebasedatabase.app" />
-          <div class="settings-btn-row">
-            <button id="settings-save-firebase" class="btn btn-secondary btn-sm settings-action-btn">Save URL</button>
-            <button id="settings-test-connection" class="btn btn-ghost btn-sm settings-action-btn">Test Connection</button>
-          </div>
+        <!-- Export result (shows the transfer code) -->
+        <div id="transfer-export-result" class="transfer-result hidden">
+          <div class="transfer-result-label">Your transfer code:</div>
+          <textarea id="transfer-export-text" class="transfer-textarea" readonly rows="3"></textarea>
+          <button id="transfer-copy-btn" class="btn btn-primary btn-sm transfer-copy-btn">Copy to Clipboard</button>
         </div>
 
-        <!-- Test connection output -->
-        <div id="connection-test-output" class="connection-test-output hidden"></div>
-
-        <div class="settings-field">
-          <label class="settings-label">Your Sync Code</label>
-          <div class="settings-code-display">
-            <span id="settings-sync-code">Not set</span>
-            <button id="settings-copy-code" class="settings-copy-btn">Copy</button>
-          </div>
-          <div class="settings-code-actions">
-            <button id="settings-generate-code" class="btn btn-secondary btn-sm settings-action-btn">Generate New Code</button>
-          </div>
+        <!-- Import form -->
+        <div id="transfer-import-form" class="transfer-result hidden">
+          <div class="transfer-result-label">Paste transfer code from the other device:</div>
+          <textarea id="transfer-import-text" class="transfer-textarea" rows="3" placeholder="GALEGO:eyJ2Ijo..."></textarea>
+          <button id="transfer-do-import-btn" class="btn btn-primary btn-sm transfer-copy-btn">Import</button>
         </div>
 
-        <div class="settings-field">
-          <label class="settings-label">Or enter an existing code</label>
-          <input id="settings-sync-code-input" type="text" class="settings-input settings-input-lg" placeholder="galego-mar-sol-42" />
-          <button id="settings-use-code" class="btn btn-primary btn-sm settings-action-btn">Use Code</button>
-        </div>
-
-        <button id="settings-sync-now" class="btn btn-primary btn-sm settings-action-btn" style="margin-top: var(--space-3);">Sync Now</button>
+        <!-- Status messages -->
+        <div id="transfer-status" class="transfer-status hidden"></div>
       </div>
     </div>
   </div>

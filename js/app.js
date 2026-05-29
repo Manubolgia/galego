@@ -5,9 +5,8 @@ import {
   isLessonRecommended, isLessonCompleted, getLessonScore,
   getUnitProgress, saveLessonScore, clearCurrentLesson,
   isUnitRecommended, markLessonDone, resetLesson,
-  isFirebaseConfigured, getSyncCode, createSyncCode,
-  setSyncCode, setupFirebase, syncNow, getFirebaseUrl,
-  onSyncStatus, initSync, testFirebaseConnection,
+  onSyncStatus, initSync,
+  login, logout, isLoggedIn, getUsername, syncNow,
   exportProgress, importProgress,
 } from './state.js';
 import {
@@ -16,7 +15,7 @@ import {
 } from './exercises.js';
 
 // ── Screen management ──────────────────────────────────────────
-const SCREENS = ['home','unit','lesson'];
+const SCREENS = ['login','home','unit','lesson'];
 
 // Track sync status globally
 let _lastSyncStatus = 'idle';
@@ -34,7 +33,7 @@ export function navigate(screenId, params = {}) {
   const backBtn = document.getElementById('back-btn');
   const topTitle = document.getElementById('top-bar-title');
 
-  if (screenId === 'home') {
+  if (screenId === 'home' || screenId === 'login') {
     topBar.classList.add('hidden');
   } else {
     topBar.classList.remove('hidden');
@@ -52,16 +51,78 @@ export function navigate(screenId, params = {}) {
   hideContextMenu();
   hideSettingsPanel();
 
+  if (screenId === 'login') renderLogin();
   if (screenId === 'home') renderHome();
   if (screenId === 'unit' && params.unitId) renderUnit(params.unitId);
   if (screenId === 'lesson' && params.lessonId) initLesson(params.unitId, params.lessonId);
 
 }
 
+// ── Login screen ───────────────────────────────────────────────
+function renderLogin() {
+  // Clear form on render
+  const usernameInput = document.getElementById('login-username');
+  const passwordInput = document.getElementById('login-password');
+  const errorEl = document.getElementById('login-error');
+
+  if (usernameInput) usernameInput.value = '';
+  if (passwordInput) passwordInput.value = '';
+  if (errorEl) {
+    errorEl.classList.add('hidden');
+    errorEl.textContent = '';
+  }
+}
+
+function setupLoginListeners() {
+  const loginBtn = document.getElementById('login-btn');
+  const usernameInput = document.getElementById('login-username');
+  const passwordInput = document.getElementById('login-password');
+  const errorEl = document.getElementById('login-error');
+
+  async function doLogin() {
+    const username = usernameInput.value.trim();
+    const password = passwordInput.value;
+
+    if (!username || !password) {
+      errorEl.textContent = 'Please fill in both fields';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Logging in…';
+    errorEl.classList.add('hidden');
+
+    const result = await login(username, password);
+
+    if (result.ok) {
+      navigate('home');
+    } else {
+      errorEl.textContent = result.error;
+      errorEl.classList.remove('hidden');
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Log In';
+    }
+  }
+
+  loginBtn.addEventListener('click', doLogin);
+
+  // Enter key to submit
+  passwordInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doLogin();
+  });
+  usernameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') passwordInput.focus();
+  });
+}
+
 // ── Home screen ────────────────────────────────────────────────
 function renderHome() {
   const list = document.getElementById('units-list');
   list.innerHTML = '';
+
+  // Update sync indicator
+  updateSyncIndicator();
 
   COURSE.forEach((unit, i) => {
     const prog = getUnitProgress(unit.id, COURSE);
@@ -319,50 +380,55 @@ function showSettingsPanel() {
   const panel = document.getElementById('settings-panel');
   panel.classList.remove('hidden');
 
-  const firebaseInput = document.getElementById('settings-firebase-url');
-  const syncCodeDisplay = document.getElementById('settings-sync-code');
+  // Show username
+  const usernameEl = document.getElementById('settings-username');
+  usernameEl.textContent = getUsername() || '—';
+
+  // Show sync status
   const syncStatus = document.getElementById('settings-sync-status');
-  const syncCodeInput = document.getElementById('settings-sync-code-input');
-
-  firebaseInput.value = getFirebaseUrl();
-
-  const code = getSyncCode();
-  if (code) {
-    syncCodeDisplay.textContent = code;
-    syncCodeInput.value = code;
+  if (_lastSyncStatus === 'synced') {
+    syncStatus.textContent = _lastSyncMessage || 'Synced ✓';
+    syncStatus.className = 'settings-sync-status synced';
+  } else if (_lastSyncStatus === 'error') {
+    syncStatus.textContent = _lastSyncMessage || 'Sync error';
+    syncStatus.className = 'settings-sync-status error';
   } else {
-    syncCodeDisplay.textContent = 'Not set';
-    syncCodeInput.value = '';
-  }
-
-  const configured = isFirebaseConfigured() && code;
-  if (!configured) {
-    syncStatus.textContent = 'Not configured';
-    syncStatus.className = 'settings-sync-status';
-  } else if (_lastSyncStatus === 'idle') {
-    syncStatus.textContent = 'Configured — not yet synced';
+    syncStatus.textContent = 'Connected';
     syncStatus.className = 'settings-sync-status active';
-  } else {
-    syncStatus.textContent = _lastSyncMessage || 'Configured';
-    syncStatus.className = `settings-sync-status ${_lastSyncStatus}`;
   }
 
   // Reset transfer UI state
   document.getElementById('transfer-export-result').classList.add('hidden');
   document.getElementById('transfer-import-form').classList.add('hidden');
   document.getElementById('transfer-status').classList.add('hidden');
-  document.getElementById('connection-test-output').classList.add('hidden');
-
-  // Auto-expand cloud sync if already configured
-  if (configured) {
-    document.getElementById('cloud-sync-content').classList.remove('hidden');
-    document.getElementById('cloud-sync-toggle').querySelector('.settings-chevron').style.transform = 'rotate(180deg)';
-  }
 }
 
 function hideSettingsPanel() {
   const panel = document.getElementById('settings-panel');
   if (panel) panel.classList.add('hidden');
+}
+
+function updateSyncIndicator() {
+  const indicator = document.getElementById('sync-indicator');
+  if (!indicator) return;
+
+  if (_lastSyncStatus === 'synced') {
+    indicator.textContent = '☁️';
+    indicator.className = 'sync-indicator synced';
+    indicator.title = 'Synced ✓';
+  } else if (_lastSyncStatus === 'syncing') {
+    indicator.textContent = '⟳';
+    indicator.className = 'sync-indicator syncing';
+    indicator.title = 'Syncing…';
+  } else if (_lastSyncStatus === 'error') {
+    indicator.textContent = '⚠';
+    indicator.className = 'sync-indicator error';
+    indicator.title = _lastSyncMessage || 'Sync error';
+  } else {
+    indicator.textContent = '☁️';
+    indicator.className = 'sync-indicator';
+    indicator.title = 'Cloud sync';
+  }
 }
 
 function setupSettingsListeners() {
@@ -380,6 +446,37 @@ function setupSettingsListeners() {
   // Close button
   document.getElementById('settings-close-btn').addEventListener('click', () => {
     hideSettingsPanel();
+  });
+
+  // ── Sync now ────────────────────────────────────────────────
+  document.getElementById('settings-sync-now').addEventListener('click', async () => {
+    const btn = document.getElementById('settings-sync-now');
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
+    try {
+      await syncNow();
+      navigate('home');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Sync Now';
+    }
+  });
+
+  // ── Logout ──────────────────────────────────────────────────
+  document.getElementById('settings-logout-btn').addEventListener('click', () => {
+    logout();
+    hideSettingsPanel();
+    navigate('login');
+  });
+
+  // ── Transfer toggle ─────────────────────────────────────────
+  document.getElementById('transfer-toggle').addEventListener('click', () => {
+    const content = document.getElementById('transfer-content');
+    const chevron = document.getElementById('transfer-toggle').querySelector('.settings-chevron');
+    const isHidden = content.classList.contains('hidden');
+
+    content.classList.toggle('hidden');
+    chevron.style.transform = isHidden ? 'rotate(180deg)' : '';
   });
 
   // ── Transfer listeners ──────────────────────────────────────
@@ -452,165 +549,19 @@ function setupSettingsListeners() {
     }
   });
 
-  // ── Cloud sync toggle ───────────────────────────────────────
-
-  document.getElementById('cloud-sync-toggle').addEventListener('click', () => {
-    const content = document.getElementById('cloud-sync-content');
-    const chevron = document.getElementById('cloud-sync-toggle').querySelector('.settings-chevron');
-    const isHidden = content.classList.contains('hidden');
-
-    content.classList.toggle('hidden');
-    chevron.style.transform = isHidden ? 'rotate(180deg)' : '';
-  });
-
-  // ── Firebase / Cloud sync listeners ─────────────────────────
-
-  // Generate new sync code
-  document.getElementById('settings-generate-code').addEventListener('click', () => {
-    const code = createSyncCode();
-    document.getElementById('settings-sync-code').textContent = code;
-    document.getElementById('settings-sync-code-input').value = code;
-    updateSyncStatusUI();
-  });
-
-  // Use existing code
-  document.getElementById('settings-use-code').addEventListener('click', () => {
-    const input = document.getElementById('settings-sync-code-input');
-    const code = input.value.trim();
-    if (code.length < 3) {
-      input.classList.add('error');
-      setTimeout(() => input.classList.remove('error'), 1500);
-      return;
-    }
-    setSyncCode(code);
-    document.getElementById('settings-sync-code').textContent = code;
-    updateSyncStatusUI();
-    // Pull from cloud with new code
-    if (isFirebaseConfigured()) {
-      syncNow().then(() => {
-        navigate('home'); // refresh UI with synced data
-      });
-    }
-  });
-
-  // Copy sync code
-  document.getElementById('settings-copy-code').addEventListener('click', () => {
-    const code = getSyncCode();
-    if (code) {
-      navigator.clipboard.writeText(code).then(() => {
-        const btn = document.getElementById('settings-copy-code');
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
-      }).catch(() => {
-        // Fallback
-        const input = document.getElementById('settings-sync-code-input');
-        input.select();
-        document.execCommand('copy');
-      });
-    }
-  });
-
-  // Save Firebase URL
-  document.getElementById('settings-save-firebase').addEventListener('click', () => {
-    const input = document.getElementById('settings-firebase-url');
-    const url = input.value.trim();
-    if (url) {
-      setupFirebase(url);
-      updateSyncStatusUI();
-      // If we have a code, sync now
-      if (getSyncCode()) {
-        syncNow().then(() => {
-          navigate('home');
-        });
-      }
-    }
-  });
-
-  // Test connection
-  document.getElementById('settings-test-connection').addEventListener('click', async () => {
-    const btn = document.getElementById('settings-test-connection');
-    const output = document.getElementById('connection-test-output');
-
-    // Save URL first if not saved
-    const urlInput = document.getElementById('settings-firebase-url');
-    const url = urlInput.value.trim();
-    if (url) {
-      setupFirebase(url);
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Testing…';
-    output.classList.remove('hidden');
-    output.textContent = 'Running diagnostics…';
-    output.className = 'connection-test-output';
-
-    try {
-      const result = await testFirebaseConnection();
-      output.textContent = result.message;
-      output.className = `connection-test-output ${result.ok ? 'success' : 'error'}`;
-    } catch (e) {
-      output.textContent = `Error: ${e.message}`;
-      output.className = 'connection-test-output error';
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Test Connection';
-    }
-  });
-
-  // Sync now button
-  document.getElementById('settings-sync-now').addEventListener('click', async () => {
-    const btn = document.getElementById('settings-sync-now');
-    btn.disabled = true;
-    btn.textContent = 'Syncing…';
-    try {
-      await syncNow();
-      navigate('home');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Sync Now';
-    }
-  });
-
   // Listen for sync status changes
   onSyncStatus((status, message) => {
     _lastSyncStatus = status;
     _lastSyncMessage = message;
+    updateSyncIndicator();
 
-    const indicator = document.getElementById('sync-indicator');
-    if (indicator) {
-      indicator.className = `sync-indicator ${status}`;
-      indicator.textContent = status === 'synced' ? '☁️' : status === 'syncing' ? '⟳' : '⚠';
-      indicator.title = message;
-    }
-    // Always update settings panel status if visible
+    // Update settings panel status if visible
     const settingsStatus = document.getElementById('settings-sync-status');
     if (settingsStatus && !document.getElementById('settings-panel').classList.contains('hidden')) {
       settingsStatus.textContent = message;
       settingsStatus.className = `settings-sync-status ${status}`;
     }
   });
-}
-
-function updateSyncStatusUI() {
-  const syncStatus = document.getElementById('settings-sync-status');
-  const configured = isFirebaseConfigured() && getSyncCode();
-
-  if (!configured) {
-    syncStatus.textContent = 'Not configured';
-    syncStatus.className = 'settings-sync-status';
-  } else if (_lastSyncStatus === 'idle' || _lastSyncStatus === 'synced') {
-    syncStatus.textContent = _lastSyncMessage || 'Configured';
-    syncStatus.className = `settings-sync-status ${_lastSyncStatus === 'synced' ? 'synced' : 'active'}`;
-  } else {
-    syncStatus.textContent = _lastSyncMessage || 'Configured';
-    syncStatus.className = `settings-sync-status ${_lastSyncStatus}`;
-  }
-
-  // Show/hide sync indicator in home header
-  const indicator = document.getElementById('sync-indicator');
-  if (indicator) {
-    indicator.classList.toggle('hidden', !configured);
-  }
 }
 
 // ── Lesson screen ──────────────────────────────────────────────
@@ -750,10 +701,15 @@ export async function init() {
     document.getElementById('exit-modal').classList.add('hidden');
   };
 
+  setupLoginListeners();
   setupSettingsListeners();
 
-  // Initialize sync
-  await initSync();
-
-  navigate('home');
+  // Check if already logged in
+  if (isLoggedIn()) {
+    // Initialize sync (pull from cloud)
+    await initSync();
+    navigate('home');
+  } else {
+    navigate('login');
+  }
 }
