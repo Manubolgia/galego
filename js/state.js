@@ -9,7 +9,7 @@ const STATE_KEY = 'galego_state_v2';
 const SESSION_KEY = 'galego_session';
 
 // ── IMPORTANT: Set this to your deployed Worker URL ──
-const SYNC_API_URL = 'https://galego-sync.manuobelleiro00.workers.dev/';
+const SYNC_API_URL = 'https://galego-sync.manuobelleiro00.workers.dev';
 
 const DEFAULT_STATE = {
   lessonScores: {},         // "unit-1/lesson-1": { score, completedAt, attempts }

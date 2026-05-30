@@ -43,7 +43,7 @@ export default {
     }
 
     const url = new URL(request.url);
-    const path = url.pathname;
+    const path = url.pathname.replace(/\/+/g, '/');  // normalize double slashes
 
     // ── Health check ──
     if (path === '/health' && request.method === 'GET') {
