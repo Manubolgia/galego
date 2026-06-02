@@ -531,9 +531,30 @@ function renderListening(ex, wrap) {
   });
   inputArea.appendChild(ta);
 
+  // Reading fallback card (hidden initially)
+  const readingCard = document.createElement('div');
+  readingCard.className = 'listening-reading-card hidden';
+  readingCard.textContent = ex.audio;
+
+  const cantListenLink = document.createElement('button');
+  cantListenLink.className = 'listening-cant-listen-btn';
+  cantListenLink.textContent = "Can't listen now";
+  cantListenLink.addEventListener('click', () => {
+    // Switch to reading mode
+    bigBtn.classList.add('hidden');
+    hint.classList.add('hidden');
+    cantListenLink.classList.add('hidden');
+    readingCard.classList.remove('hidden');
+    hdr.querySelector('.exercise-type-label').textContent = 'Reading';
+    ta.placeholder = 'Type what you read…';
+    ta.focus();
+  });
+
   section.appendChild(bigBtn);
   section.appendChild(hint);
+  section.appendChild(readingCard);
   section.appendChild(inputArea);
+  section.appendChild(cantListenLink);
   wrap.appendChild(section);
 
   enableCheck(false);

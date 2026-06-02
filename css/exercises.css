@@ -435,6 +435,35 @@
   width: 100%;
 }
 
+.listening-reading-card {
+  background: var(--color-surface-2, #1e293b);
+  border: 2px solid var(--color-primary-500, #3b82f6);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--space-4, 1rem) var(--space-6, 1.5rem);
+  font-size: var(--text-xl, 1.25rem);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-align: center;
+  letter-spacing: 0.02em;
+  width: 100%;
+}
+
+.listening-cant-listen-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-tertiary);
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  margin-top: var(--space-2, 0.5rem);
+  transition: color var(--transition-fast);
+}
+
+.listening-cant-listen-btn:hover {
+  color: var(--color-text-secondary);
+}
+
 /* === EXERCISE TRANSITION === */
 .exercise-wrapper.exit {
   animation: slideOutLeft var(--transition-slow) ease forwards;

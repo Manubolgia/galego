@@ -1,5 +1,5 @@
 // Galego Service Worker — Cache-first strategy
-const CACHE_NAME = 'galego-v3.0.1';
+const CACHE_NAME = 'galego-v3.0.2';
 
 const PRECACHE_URLS = [
   './index.html',
