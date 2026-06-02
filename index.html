@@ -293,6 +293,10 @@
             });
           }
         });
+        // When a new SW takes control, reload so the fresh files are used
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          window.location.reload();
+        });
       } catch (e) {
         console.warn('Galego: SW registration issue', e);
       }
