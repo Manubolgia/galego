@@ -240,8 +240,8 @@ export async function login(username, password) {
     // Save session
     _saveSession(cleanUsername, passwordHash);
 
-    // Merge cloud progress with local
-    _ensureLoaded();
+    // Start from a clean slate, then load cloud progress
+    _state = { ...DEFAULT_STATE };
     if (data.progress && data.progress.lessonScores) {
       _mergeScores(data.progress.lessonScores);
     }
