@@ -366,6 +366,26 @@ function renderWordBank(ex, wrap) {
   wrap.appendChild(sentenceBox);
   wrap.appendChild(divider);
   wrap.appendChild(pool);
+
+  if (ex.audio) {
+    const readingCard = document.createElement('div');
+    readingCard.className = 'listening-reading-card hidden';
+    readingCard.textContent = ex.audio;
+
+    const cantListenBtn = document.createElement('button');
+    cantListenBtn.className = 'listening-cant-listen-btn';
+    cantListenBtn.textContent = "Can't listen now";
+    cantListenBtn.addEventListener('click', () => {
+      readingCard.classList.remove('hidden');
+      cantListenBtn.classList.add('hidden');
+      const lbl = wrap.querySelector('.exercise-type-label');
+      if (lbl) lbl.textContent = 'Reading';
+    });
+
+    wrap.appendChild(readingCard);
+    wrap.appendChild(cantListenBtn);
+  }
+
   enableCheck(false);
   window._currentAnswer = [];
 }
