@@ -1,6 +1,31 @@
 // Galego — Exercise Engine
 import { getLessonExercises } from './data/exercises.js';
-import { speak, isSupported as audioSupported } from './audio.js';
+import { speak as wsSpeak, stop as wsStop } from './audio.js';
+import { speak as eSpeakSpeak, cancel as eSpeakCancel } from './tts.js';
+
+// Try eSpeak-ng first; fall back to Web Speech API if it fails or is unavailable.
+async function speak(text, onStart, onEnd) {
+  let usedEspeak = false;
+  try {
+    if (text) {
+      if (onStart) onStart();
+      await eSpeakSpeak(text);
+      usedEspeak = true;
+    }
+  } catch (_) {
+    usedEspeak = false;
+  }
+  if (!usedEspeak) {
+    wsSpeak(text, onStart, onEnd);
+    return;
+  }
+  if (onEnd) onEnd();
+}
+
+function cancelSpeech() {
+  eSpeakCancel();
+  wsStop();
+}
 
 let _state = null; // { exercises, index, correct, wrong[], answers }
 let _onComplete = null;
