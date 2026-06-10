@@ -307,7 +307,132 @@ function renderWordBank(ex, wrap) {
   const pool = document.createElement('div');
   pool.className = 'word-bank-pool';
 
-  const chosen = []; // words in sentence
+  const chosen = []; // sentTiles in order
+
+  function syncAnswer() {
+    window._currentAnswer = chosen.map(t => t.dataset.word);
+    enableCheck(chosen.length > 0);
+  }
+
+  function removeSentTile(sentTile) {
+    const idx = chosen.indexOf(sentTile);
+    if (idx > -1) chosen.splice(idx, 1);
+    sentTile.remove();
+    sentTile._poolTile.classList.remove('used');
+    if (sentenceBox.querySelectorAll('.word-tile').length === 0) {
+      sentenceBox.appendChild(placeholder);
+    }
+    syncAnswer();
+  }
+
+  function makeSentTile(word, poolTile) {
+    const sentTile = document.createElement('button');
+    sentTile.className = 'word-tile in-sentence';
+    sentTile.textContent = word;
+    sentTile.dataset.word = word;
+    sentTile._poolTile = poolTile;
+
+    // ── tap to remove ──────────────────────────────────────────
+    sentTile.addEventListener('click', () => {
+      if (sentTile._dragged) return; // swallow click after a drag
+      removeSentTile(sentTile);
+    });
+
+    // ── drag to reorder (pointer events, works mouse + touch) ──
+    sentTile.addEventListener('pointerdown', e => {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.stopPropagation();
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      let dragging = false;
+      let ghost = null;
+      sentTile._dragged = false;
+
+      const DRAG_THRESHOLD = 6; // px before we commit to drag
+
+      function startDrag() {
+        dragging = true;
+        sentTile._dragged = true;
+        sentTile.setPointerCapture(e.pointerId);
+        sentTile.classList.add('dragging');
+
+        ghost = document.createElement('div');
+        ghost.className = 'word-tile drag-ghost';
+        ghost.textContent = word;
+        const r = sentTile.getBoundingClientRect();
+        ghost.style.cssText = `width:${r.width}px;height:${r.height}px;top:${r.top + window.scrollY}px;left:${r.left}px;`;
+        document.body.appendChild(ghost);
+      }
+
+      function onMove(ev) {
+        if (!dragging) {
+          if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > DRAG_THRESHOLD) startDrag();
+          return;
+        }
+        const r = sentTile.getBoundingClientRect();
+        ghost.style.top  = (ev.clientY - r.height / 2 + window.scrollY) + 'px';
+        ghost.style.left = (ev.clientX - r.width  / 2) + 'px';
+
+        // find tile under cursor (ignore ghost + dragged tile)
+        ghost.style.pointerEvents = 'none';
+        const under = document.elementFromPoint(ev.clientX, ev.clientY);
+        ghost.style.pointerEvents = '';
+
+        const target = under && under.closest('.word-tile.in-sentence');
+        sentenceBox.querySelectorAll('.word-tile.in-sentence').forEach(t => t.classList.remove('drag-over'));
+        if (target && target !== sentTile) target.classList.add('drag-over');
+      }
+
+      function onUp(ev) {
+        sentTile.removeEventListener('pointermove', onMove);
+        sentTile.removeEventListener('pointerup', onUp);
+        sentTile.removeEventListener('pointercancel', onUp);
+
+        if (!dragging) return;
+        dragging = false;
+        sentTile.classList.remove('dragging');
+        if (ghost) { ghost.remove(); ghost = null; }
+        sentenceBox.querySelectorAll('.drag-over').forEach(t => t.classList.remove('drag-over'));
+
+        ghost && ghost.remove();
+        ghost = null;
+
+        // find drop target
+        const under = document.elementFromPoint(ev.clientX, ev.clientY);
+        const target = under && under.closest('.word-tile.in-sentence');
+        if (target && target !== sentTile) {
+          // swap in chosen array
+          const aIdx = chosen.indexOf(sentTile);
+          const bIdx = chosen.indexOf(target);
+          if (aIdx > -1 && bIdx > -1) {
+            [chosen[aIdx], chosen[bIdx]] = [chosen[bIdx], chosen[aIdx]];
+            // swap in DOM
+            const aNext = sentTile.nextSibling;
+            const bNext = target.nextSibling;
+            if (aNext === target) {
+              sentenceBox.insertBefore(target, sentTile);
+            } else if (bNext === sentTile) {
+              sentenceBox.insertBefore(sentTile, target);
+            } else {
+              sentenceBox.insertBefore(target, aNext);
+              sentenceBox.insertBefore(sentTile, bNext);
+            }
+            syncAnswer();
+          }
+        }
+
+        // reset _dragged flag after the click event fires
+        setTimeout(() => { sentTile._dragged = false; }, 0);
+      }
+
+      sentTile.addEventListener('pointermove', onMove);
+      sentTile.addEventListener('pointerup', onUp);
+      sentTile.addEventListener('pointercancel', onUp);
+    });
+
+    return sentTile;
+  }
 
   const shuffled = shuffle(ex.wordBank);
   shuffled.forEach(word => {
@@ -317,29 +442,12 @@ function renderWordBank(ex, wrap) {
     tile.dataset.word = word;
     tile.addEventListener('click', () => {
       if (tile.classList.contains('used')) return;
-      chosen.push(word);
       tile.classList.add('used');
-
-      const sentTile = document.createElement('button');
-      sentTile.className = 'word-tile in-sentence';
-      sentTile.textContent = word;
-      sentTile.addEventListener('click', () => {
-        // remove from sentence
-        const idx = chosen.indexOf(word);
-        if (idx > -1) chosen.splice(idx, 1);
-        sentTile.remove();
-        tile.classList.remove('used');
-        if (sentenceBox.querySelectorAll('.word-tile').length === 0) {
-          sentenceBox.appendChild(placeholder);
-        }
-        enableCheck(chosen.length > 0);
-        window._currentAnswer = [...chosen];
-      });
-
+      const sentTile = makeSentTile(word, tile);
       placeholder.remove();
+      chosen.push(sentTile);
       sentenceBox.appendChild(sentTile);
-      enableCheck(chosen.length > 0);
-      window._currentAnswer = [...chosen];
+      syncAnswer();
     });
     pool.appendChild(tile);
   });
@@ -413,9 +521,45 @@ function renderMatching(ex, wrap) {
   const leftItems = pairs.map(p => p.gl);
   const rightItems = shuffle(pairs.map(p => p.en));
 
-  let selectedLeft = null;
+  // selection state: track which side + value is selected
+  let selectedSide = null; // 'left' or 'right'
+  let selectedValue = null;
   let matched = 0;
   const total = pairs.length;
+
+  function clearSelection() {
+    grid.querySelectorAll('.matching-item:not(.matched)').forEach(b => b.classList.remove('selected'));
+    selectedSide = null;
+    selectedValue = null;
+  }
+
+  function tryMatch(leftVal, rightVal) {
+    const pair = pairs.find(p => p.gl === leftVal);
+    if (pair && pair.en === rightVal) {
+      matched++;
+      grid.querySelectorAll('.matching-item').forEach(b => {
+        if (b.dataset.value === leftVal || b.dataset.value === rightVal) {
+          b.classList.remove('selected', 'wrong');
+          b.classList.add('matched');
+        }
+      });
+      clearSelection();
+      if (matched === total) {
+        window._currentAnswer = '__matching_done__';
+        enableCheck(true);
+      }
+    } else {
+      const leftBtn = grid.querySelector(`.matching-item.galician[data-value="${CSS.escape(leftVal)}"]`);
+      const rightBtn = grid.querySelector(`.matching-item:not(.galician)[data-value="${CSS.escape(rightVal)}"]`);
+      if (leftBtn) leftBtn.classList.add('wrong');
+      if (rightBtn) rightBtn.classList.add('wrong');
+      setTimeout(() => {
+        if (leftBtn) leftBtn.classList.remove('wrong', 'selected');
+        if (rightBtn) rightBtn.classList.remove('wrong', 'selected');
+        clearSelection();
+      }, 700);
+    }
+  }
 
   function makeItem(text, isLeft) {
     const btn = document.createElement('button');
@@ -425,41 +569,24 @@ function renderMatching(ex, wrap) {
     btn.addEventListener('click', () => {
       if (btn.classList.contains('matched')) return;
 
-      if (isLeft) {
-        document.querySelectorAll('.matching-item').forEach(b => {
-          if (!b.classList.contains('matched')) b.classList.remove('selected');
-        });
-        selectedLeft = text;
+      const thisSide = isLeft ? 'left' : 'right';
+
+      if (selectedSide === null) {
+        // nothing selected yet — select this item
+        selectedSide = thisSide;
+        selectedValue = text;
+        btn.classList.add('selected');
+      } else if (selectedSide === thisSide) {
+        // same side clicked — switch selection
+        clearSelection();
+        selectedSide = thisSide;
+        selectedValue = text;
         btn.classList.add('selected');
       } else {
-        if (!selectedLeft) return;
-        // check match
-        const pair = pairs.find(p => p.gl === selectedLeft);
-        if (pair && pair.en === text) {
-          // correct
-          matched++;
-          document.querySelectorAll('.matching-item').forEach(b => {
-            if (b.dataset.value === selectedLeft || b.dataset.value === text) {
-              b.classList.remove('selected', 'wrong');
-              b.classList.add('matched');
-            }
-          });
-          selectedLeft = null;
-          if (matched === total) {
-            window._currentAnswer = '__matching_done__';
-            enableCheck(true);
-          }
-        } else {
-          // wrong flash
-          btn.classList.add('wrong');
-          const leftBtn = document.querySelector(`.matching-item.galician[data-value="${selectedLeft}"]`);
-          if (leftBtn) leftBtn.classList.add('wrong');
-          setTimeout(() => {
-            btn.classList.remove('wrong', 'selected');
-            if (leftBtn) leftBtn.classList.remove('wrong', 'selected');
-            selectedLeft = null;
-          }, 700);
-        }
+        // opposite side clicked — attempt match
+        const leftVal  = isLeft ? text : selectedValue;
+        const rightVal = isLeft ? selectedValue : text;
+        tryMatch(leftVal, rightVal);
       }
     });
     return btn;

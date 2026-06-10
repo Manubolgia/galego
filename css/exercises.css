@@ -301,6 +301,38 @@
   cursor: default;
 }
 
+.word-tile.dragging {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.word-tile.drag-over {
+  border-color: var(--color-primary-300);
+  background: hsla(189, 54%, 45%, 0.22);
+  transform: scale(1.06);
+}
+
+.word-tile.drag-ghost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.92;
+  background: var(--color-bg-elevated);
+  border: 1.5px solid var(--color-primary-400);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary-200);
+  box-shadow: var(--shadow-md), 0 0 0 2px hsla(189, 54%, 50%, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: scale(1.08) rotate(2deg);
+  transition: none;
+  cursor: grabbing;
+}
+
 /* === FILL IN THE BLANK === */
 .fill-blank-sentence {
   font-size: var(--text-xl);
