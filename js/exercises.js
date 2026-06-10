@@ -293,7 +293,12 @@ function renderTranslate(ex, wrap) {
 
 // Word bank
 function renderWordBank(ex, wrap) {
-  wrap.appendChild(header(ex, 'Build the Sentence'));
+  // The English sentence to translate lives in ex.sentence; ex.prompt is just a label.
+  const promptDiv = document.createElement('div');
+  promptDiv.className = 'exercise-header';
+  promptDiv.innerHTML = `<div class="exercise-type-label">Build the Sentence</div>
+    <div class="exercise-prompt">${ex.sentence || ex.prompt}</div>`;
+  wrap.appendChild(promptDiv);
   const sentenceBox = document.createElement('div');
   sentenceBox.className = 'word-bank-sentence';
   const placeholder = document.createElement('span');

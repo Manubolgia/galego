@@ -385,5 +385,5 @@ a {
   /* Results screen: no motion — show final state instantly, no confetti */
   .confetti-layer { display: none !important; }
   .results-percent.pop { animation: none !important; }
-  .mascot { animation: none !important; }
+  .mascot-rig, .mascot-shadow { animation: none !important; }
 }

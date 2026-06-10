@@ -1548,25 +1548,55 @@
   width: 100%;
 }
 
-/* Mascot */
+/* Mascot — sits in the bottom-right corner, peeking in, facing the score */
 .mascot {
-  filter: drop-shadow(var(--shadow-md));
+  position: absolute;
+  right: var(--space-3);
+  bottom: 84px; /* clear the Continue button */
+  z-index: 3;
+  pointer-events: none;
 }
-.mascot svg { display: block; }
+.mascot svg {
+  display: block;
+  overflow: visible;
+}
 
-.mascot-shadow { fill: hsla(200, 50%, 3%, 0.35); }
+.mascot-shadow {
+  fill: hsla(200, 50%, 3%, 0.35);
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: mascot-shadow-pulse 1.6s ease-in-out infinite;
+}
+
+/* squash/stretch + jump rig — transform-origin at the feet */
+.mascot-rig {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+
 .mascot-body {
   fill: var(--color-primary-400);
   stroke: var(--color-primary-200);
   stroke-width: 2;
+  stroke-linejoin: round;
 }
-.mascot-eyes-open circle { fill: var(--color-ocean-900); }
+.mascot-ear {
+  fill: var(--color-primary-400);
+  stroke: var(--color-primary-200);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.mascot-ear-inner { fill: hsla(7, 64%, 60%, 0.55); }
+
+.mascot-eye-big,
+.mascot-eye-small { fill: var(--color-neutral-0); stroke: var(--color-ocean-900); stroke-width: 1.5; }
+.mascot-pupil { fill: var(--color-ocean-900); }
 .mascot-eye-shine { fill: var(--color-neutral-0) !important; }
 .mascot-eyes-happy path { stroke: var(--color-ocean-900); }
 .mascot-mouth-neutral,
 .mascot-mouth-happy,
 .mascot-mouth-sad { stroke: var(--color-ocean-900); }
-.mascot-cheek { fill: hsla(7, 64%, 60%, 0.5); }
+.mascot-cheek { fill: hsla(7, 64%, 60%, 0.6); }
 
 /* Mood: hide all expression variants by default, reveal per mood */
 .mascot-eyes-happy,
@@ -1576,33 +1606,52 @@
 .mascot-eyes-open,
 .mascot-mouth-neutral { display: block; }
 
+/* ── GREAT: jumps with squash & stretch, happy face ── */
 .mascot.mood-great .mascot-eyes-open,
 .mascot.mood-great .mascot-mouth-neutral { display: none; }
 .mascot.mood-great .mascot-eyes-happy,
 .mascot.mood-great .mascot-mouth-happy,
 .mascot.mood-great .mascot-cheek { display: block; }
-.mascot.mood-great { animation: mascot-bounce 0.7s ease-in-out 2; }
+.mascot.mood-great .mascot-rig {
+  animation: mascot-jump 0.9s cubic-bezier(.5,0,.5,1) infinite;
+}
 
-.mascot.mood-neutral { animation: mascot-wobble 1.6s ease-in-out infinite; }
+/* ── NEUTRAL: little hop + lean ── */
+.mascot.mood-neutral .mascot-rig {
+  animation: mascot-hop 1.8s ease-in-out infinite;
+}
 
+/* ── POOR: slumped, slow sad sway, droopy colour ── */
 .mascot.mood-poor .mascot-mouth-neutral { display: none; }
 .mascot.mood-poor .mascot-mouth-sad { display: block; }
-.mascot.mood-poor { animation: mascot-droop 2.2s ease-in-out infinite; }
-.mascot.mood-poor .mascot-body { fill: var(--color-primary-300); }
+.mascot.mood-poor .mascot-body,
+.mascot.mood-poor .mascot-ear { fill: var(--color-primary-300); }
+.mascot.mood-poor .mascot-rig {
+  animation: mascot-slump 2.4s ease-in-out infinite;
+}
 
-@keyframes mascot-bounce {
-  0%, 100% { transform: translateY(0) scale(1); }
-  30%      { transform: translateY(-16px) scale(1.04); }
-  55%      { transform: translateY(0) scale(0.98); }
-  75%      { transform: translateY(-6px) scale(1.01); }
+/* big celebratory jump with anticipation, squash, stretch, landing wobble */
+@keyframes mascot-jump {
+  0%   { transform: translateY(0)    scaleX(1)    scaleY(1)    rotate(-3deg); }
+  15%  { transform: translateY(4px)  scaleX(1.12) scaleY(0.86) rotate(-3deg); } /* squash (anticipation) */
+  40%  { transform: translateY(-34px) scaleX(0.9) scaleY(1.14) rotate(2deg); }  /* stretch (airborne) */
+  60%  { transform: translateY(-30px) scaleX(0.94) scaleY(1.08) rotate(4deg); }
+  80%  { transform: translateY(3px)  scaleX(1.14) scaleY(0.84) rotate(-2deg); } /* land squash */
+  92%  { transform: translateY(-4px) scaleX(0.98) scaleY(1.03) rotate(-3deg); } /* bounce back */
+  100% { transform: translateY(0)    scaleX(1)    scaleY(1)    rotate(-3deg); }
 }
-@keyframes mascot-wobble {
-  0%, 100% { transform: rotate(-2deg); }
-  50%      { transform: rotate(2deg); }
+@keyframes mascot-hop {
+  0%, 100% { transform: translateY(0)   scaleX(1)    scaleY(1)    rotate(-2deg); }
+  45%      { transform: translateY(-10px) scaleX(0.96) scaleY(1.06) rotate(2deg); }
+  60%      { transform: translateY(2px)  scaleX(1.06) scaleY(0.94) rotate(2deg); }
 }
-@keyframes mascot-droop {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50%      { transform: translateY(4px) rotate(-3deg); }
+@keyframes mascot-slump {
+  0%, 100% { transform: translateY(0)   scaleY(1)    rotate(-5deg); }
+  50%      { transform: translateY(3px) scaleY(0.97) rotate(-9deg); }
+}
+@keyframes mascot-shadow-pulse {
+  0%, 100% { transform: scaleX(1);    opacity: 0.35; }
+  50%      { transform: scaleX(0.82); opacity: 0.22; }
 }
 
 /* Score ring + count-up */

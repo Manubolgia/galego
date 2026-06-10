@@ -356,8 +356,9 @@ const reducedMotion = () =>
 function animateScore(score) {
   const percentEl = document.getElementById('results-percent');
   const ring = document.getElementById('results-ring-fill');
+  // Inline style (not setAttribute) so it overrides the stylesheet's stroke-dashoffset.
   const setRing = (v) =>
-    ring.setAttribute('stroke-dashoffset', RING_CIRCUMFERENCE * (1 - v / 100));
+    ring.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - v / 100));
 
   if (reducedMotion()) {
     percentEl.textContent = `${score}%`;
