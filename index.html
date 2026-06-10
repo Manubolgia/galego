@@ -86,6 +86,7 @@
       <!-- Settings & Sync -->
       <div class="home-header-actions">
         <button id="sync-indicator" class="sync-indicator" title="Sync status">☁️</button>
+        <span id="cache-version-badge" class="cache-version-badge" title="Cached app version"></span>
         <button id="settings-btn" class="settings-btn" aria-label="Settings">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"></circle>
@@ -311,6 +312,16 @@
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           window.location.reload();
         });
+
+        // Show active cache version next to the sync icon
+        try {
+          const cacheNames = await caches.keys();
+          const activeCache = cacheNames.find(n => n.startsWith('galego-'));
+          const badge = document.getElementById('cache-version-badge');
+          if (badge && activeCache) {
+            badge.textContent = activeCache.replace('galego-', '');
+          }
+        } catch (_) {}
       } catch (e) {
         console.warn('Galego: SW registration issue', e);
       }

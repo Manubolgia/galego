@@ -1144,6 +1144,18 @@
   color: var(--color-red-400);
 }
 
+.cache-version-badge {
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--color-neutral-400);
+  background: var(--color-neutral-700);
+  border-radius: var(--radius-full);
+  padding: 2px 7px;
+  line-height: 1.6;
+  white-space: nowrap;
+  user-select: none;
+}
+
 /* === SETTINGS BUTTON (in home header) === */
 .settings-btn {
   width: 36px;
