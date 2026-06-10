@@ -15,7 +15,7 @@ import {
 import { haptics, installGlobalHaptics } from './haptics.js';
 
 // ── Screen management ──────────────────────────────────────────
-const SCREENS = ['login','home','unit','lesson'];
+const SCREENS = ['login','home','unit','lesson','results'];
 
 // Track sync status globally
 let _lastSyncStatus = 'idle';
@@ -41,7 +41,7 @@ export function navigate(screenId, params = {}) {
       topTitle.textContent = params.unit.title;
       backBtn.onclick = () => navigate('home');
       backBtn.style.visibility = 'visible';
-    } else if (screenId === 'lesson') {
+    } else if (screenId === 'lesson' || screenId === 'results') {
       topTitle.textContent = '';
       backBtn.style.visibility = 'hidden';
     }
@@ -55,6 +55,7 @@ export function navigate(screenId, params = {}) {
   if (screenId === 'home') renderHome();
   if (screenId === 'unit' && params.unitId) renderUnit(params.unitId);
   if (screenId === 'lesson' && params.lessonId) initLesson(params.unitId, params.lessonId);
+  if (screenId === 'results') renderResults(params);
 
 }
 
@@ -301,6 +302,113 @@ function renderUnit(unitId) {
   startBtn.disabled = false;
   startBtn.textContent = firstNotDone ? 'Start Lesson' : 'Practice Again';
   startBtn.onclick = () => navigate('lesson', { unitId, lessonId: targetLesson });
+}
+
+// ── Lesson results screen ──────────────────────────────────────
+const RESULT_TIERS = {
+  great:   { messages: ['Brillante!', 'Espectacular!', 'Que crack!'] },
+  neutral: { messages: ['Boa! Segue así.', 'Vas ben.', 'Bo traballo!'] },
+  poor:    { messages: ['Non pasa nada — téntao de novo!', 'A práctica fai o mestre.', 'Sigue intentándoo!'] },
+};
+
+function tierForScore(score) {
+  if (score >= 80) return 'great';
+  if (score >= 50) return 'neutral';
+  return 'poor';
+}
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function renderResults({ unitId, score = 0, correct = 0, total = 0 }) {
+  const tier = tierForScore(score);
+
+  // Mascot mood
+  const mascot = document.getElementById('mascot');
+  mascot.className = `mascot mood-${tier}`;
+
+  // Ring colour by tier
+  const ring = document.getElementById('results-ring-fill');
+  ring.classList.remove('tier-great', 'tier-neutral', 'tier-poor');
+  ring.classList.add(`tier-${tier}`);
+
+  // Message + stats
+  document.getElementById('results-message').textContent = pick(RESULT_TIERS[tier].messages);
+  document.getElementById('results-stats').textContent = `${correct} / ${total} correct`;
+
+  // Tier-specific haptic
+  haptics[tier === 'great' ? 'success' : tier === 'neutral' ? 'medium' : 'error']();
+
+  // Continue button → back to unit
+  document.getElementById('results-continue-btn').onclick =
+    () => navigate('unit', { unitId, unit: getUnit(unitId) });
+
+  // Confetti only on a great score
+  clearConfetti();
+  if (tier === 'great') spawnConfetti();
+
+  animateScore(score);
+}
+
+const RING_CIRCUMFERENCE = 126.92; // 2π·20.2
+const reducedMotion = () =>
+  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function animateScore(score) {
+  const percentEl = document.getElementById('results-percent');
+  const ring = document.getElementById('results-ring-fill');
+  const setRing = (v) =>
+    ring.setAttribute('stroke-dashoffset', RING_CIRCUMFERENCE * (1 - v / 100));
+
+  if (reducedMotion()) {
+    percentEl.textContent = `${score}%`;
+    setRing(score);
+    return;
+  }
+
+  const duration = 900;
+  const start = performance.now();
+  setRing(0);
+  percentEl.textContent = '0%';
+
+  function frame(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
+    const current = Math.round(score * eased);
+    percentEl.textContent = `${current}%`;
+    setRing(score * eased);
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      percentEl.classList.remove('pop');
+      void percentEl.offsetWidth; // restart animation
+      percentEl.classList.add('pop');
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+const CONFETTI_COLORS = ['#3fb8c8', '#4fc28b', '#e0a548', '#e07a5f', '#86d0e0'];
+
+function spawnConfetti() {
+  const layer = document.getElementById('confetti-layer');
+  const count = 28;
+  for (let i = 0; i < count; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = pick(CONFETTI_COLORS);
+    piece.style.animationDuration = `${1.6 + Math.random() * 1.4}s`;
+    piece.style.animationDelay = `${Math.random() * 0.5}s`;
+    piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+    layer.appendChild(piece);
+  }
+  // Clean up after the longest possible run (duration + delay + buffer)
+  setTimeout(clearConfetti, 4000);
+}
+
+function clearConfetti() {
+  const layer = document.getElementById('confetti-layer');
+  if (layer) layer.innerHTML = '';
 }
 
 // ── Context menu (long-press on lesson dots) ───────────────────
@@ -579,7 +687,12 @@ function initLesson(unitId, lessonId) {
     haptics.complete();
     saveLessonScore(unitId, lessonId, result.score);
     clearCurrentLesson();
-    navigate('unit', { unitId, unit: getUnit(unitId) });
+    navigate('results', {
+      unitId,
+      score: result.score,
+      correct: result.correct,
+      total: result.total,
+    });
   });
 
   if (!ex) {

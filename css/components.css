@@ -1521,3 +1521,161 @@
   line-height: var(--leading-relaxed);
   margin-top: var(--space-1);
 }
+
+/* ── Lesson results screen ─────────────────────────────────────── */
+.results-layout {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding: var(--space-6) var(--space-5);
+}
+
+.results-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  text-align: center;
+}
+
+.results-bottom {
+  padding-top: var(--space-6);
+}
+.results-bottom .btn {
+  width: 100%;
+}
+
+/* Mascot */
+.mascot {
+  filter: drop-shadow(var(--shadow-md));
+}
+.mascot svg { display: block; }
+
+.mascot-shadow { fill: hsla(200, 50%, 3%, 0.35); }
+.mascot-body {
+  fill: var(--color-primary-400);
+  stroke: var(--color-primary-200);
+  stroke-width: 2;
+}
+.mascot-eyes-open circle { fill: var(--color-ocean-900); }
+.mascot-eye-shine { fill: var(--color-neutral-0) !important; }
+.mascot-eyes-happy path { stroke: var(--color-ocean-900); }
+.mascot-mouth-neutral,
+.mascot-mouth-happy,
+.mascot-mouth-sad { stroke: var(--color-ocean-900); }
+.mascot-cheek { fill: hsla(7, 64%, 60%, 0.5); }
+
+/* Mood: hide all expression variants by default, reveal per mood */
+.mascot-eyes-happy,
+.mascot-mouth-happy,
+.mascot-mouth-sad,
+.mascot-cheek { display: none; }
+.mascot-eyes-open,
+.mascot-mouth-neutral { display: block; }
+
+.mascot.mood-great .mascot-eyes-open,
+.mascot.mood-great .mascot-mouth-neutral { display: none; }
+.mascot.mood-great .mascot-eyes-happy,
+.mascot.mood-great .mascot-mouth-happy,
+.mascot.mood-great .mascot-cheek { display: block; }
+.mascot.mood-great { animation: mascot-bounce 0.7s ease-in-out 2; }
+
+.mascot.mood-neutral { animation: mascot-wobble 1.6s ease-in-out infinite; }
+
+.mascot.mood-poor .mascot-mouth-neutral { display: none; }
+.mascot.mood-poor .mascot-mouth-sad { display: block; }
+.mascot.mood-poor { animation: mascot-droop 2.2s ease-in-out infinite; }
+.mascot.mood-poor .mascot-body { fill: var(--color-primary-300); }
+
+@keyframes mascot-bounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30%      { transform: translateY(-16px) scale(1.04); }
+  55%      { transform: translateY(0) scale(0.98); }
+  75%      { transform: translateY(-6px) scale(1.01); }
+}
+@keyframes mascot-wobble {
+  0%, 100% { transform: rotate(-2deg); }
+  50%      { transform: rotate(2deg); }
+}
+@keyframes mascot-droop {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50%      { transform: translateY(4px) rotate(-3deg); }
+}
+
+/* Score ring + count-up */
+.results-ring-wrap {
+  position: relative;
+  width: 160px;
+  height: 160px;
+}
+.results-ring { transform: none; }
+.results-ring-track {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 3.4;
+}
+.results-ring-fill {
+  fill: none;
+  stroke: var(--color-green-400);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  /* circumference of r=20.2 ≈ 126.92; start fully empty */
+  stroke-dasharray: 126.92;
+  stroke-dashoffset: 126.92;
+  transition: stroke-dashoffset 0.05s linear;
+}
+.results-ring-fill.tier-poor { stroke: var(--color-red-400); }
+.results-ring-fill.tier-neutral { stroke: var(--color-gold-400); }
+.results-ring-fill.tier-great { stroke: var(--color-green-400); }
+
+.results-percent {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+.results-percent.pop { animation: results-number-pop 0.4s ease-out; }
+@keyframes results-number-pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+
+.results-message {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.results-stats {
+  font-size: var(--text-base);
+  color: var(--color-text-secondary);
+}
+
+/* Confetti */
+.confetti-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+}
+.confetti-piece {
+  position: absolute;
+  top: -12px;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confetti-fall linear forwards;
+}
+@keyframes confetti-fall {
+  0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+}
