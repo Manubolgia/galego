@@ -129,19 +129,32 @@
   --radius-full: 9999px;
 
   /* === SHADOWS === */
-  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
-  --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.25);
-  --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-xl:  0 16px 40px rgba(0, 0, 0, 0.5), 0 8px 20px rgba(0, 0, 0, 0.35);
-  --shadow-glow-primary: 0 0 24px hsla(210, 65%, 45%, 0.4);
-  --shadow-glow-correct: 0 0 20px hsla(150, 40%, 40%, 0.45);
-  --shadow-glow-incorrect: 0 0 20px hsla(0, 60%, 48%, 0.4);
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15);
+  --shadow-md:  0 2px 8px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
+  --shadow-lg:  0 6px 20px rgba(0,0,0,0.38), 0 2px 8px rgba(0,0,0,0.22);
+  --shadow-xl:  0 12px 40px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3);
+
+  /* Inset light-edge on elevated surfaces — simulates top light source */
+  --shadow-inset-top: inset 0 1px 0 rgba(255,255,255,0.07);
+
+  /* Colored ambient glows */
+  --shadow-glow-primary:   0 0 20px hsla(210, 65%, 50%, 0.35), 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-glow-correct:   0 0 18px hsla(150, 40%, 42%, 0.4), 0 4px 12px rgba(0,0,0,0.25);
+  --shadow-glow-incorrect: 0 0 18px hsla(0, 60%, 48%, 0.38), 0 4px 12px rgba(0,0,0,0.25);
 
   /* === TRANSITIONS === */
-  --transition-fast:   150ms ease;
-  --transition-base:   200ms ease;
-  --transition-slow:   300ms ease;
-  --transition-slower: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Press: snappy. Release/enter: spring-like overshoot feel via cubic-bezier */
+  --ease-out-expo:   cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back:   cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-in-expo:    cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-standard:   cubic-bezier(0.4, 0, 0.2, 1);
+
+  --transition-instant: 80ms var(--ease-in-expo);     /* button press-down */
+  --transition-fast:    140ms var(--ease-out-expo);   /* button release, hover */
+  --transition-base:    220ms var(--ease-out-expo);   /* card hover, panel open */
+  --transition-slow:    320ms var(--ease-out-expo);   /* screen enter, feedback */
+  --transition-slower:  420ms var(--ease-standard);   /* modal, slide transitions */
+  --transition-spring:  380ms var(--ease-out-back);   /* pop/bounce feel */
 
   /* === Z-INDEX LAYERS === */
   --z-base:    0;
@@ -228,28 +241,28 @@ a {
 
 /* === ANIMATIONS === */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(40px); }
+  from { opacity: 0; transform: translateY(32px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(40px); }
+  from { opacity: 0; transform: translateX(32px); }
   to   { opacity: 1; transform: translateX(0); }
 }
 
 @keyframes slideOutLeft {
   from { opacity: 1; transform: translateX(0); }
-  to   { opacity: 0; transform: translateX(-40px); }
+  to   { opacity: 0; transform: translateX(-32px); }
 }
 
 @keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 hsla(210, 65%, 45%, 0.4); }
-  50%       { box-shadow: 0 0 0 8px hsla(210, 65%, 45%, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 hsla(210, 65%, 50%, 0.5); }
+  50%       { box-shadow: 0 0 0 7px hsla(210, 65%, 50%, 0); }
 }
 
 @keyframes spinCount {
@@ -262,23 +275,27 @@ a {
   100% { background-position: 200% center; }
 }
 
+/* Subtle scale bounce — used for pop feedback */
 @keyframes bounce {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.08); }
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.1); }
+  70%  { transform: scale(0.97); }
+  100% { transform: scale(1); }
 }
 
 @keyframes correctPop {
-  0%   { transform: scale(0.95); }
-  60%  { transform: scale(1.05); }
+  0%   { transform: scale(0.94); }
+  55%  { transform: scale(1.04); }
   100% { transform: scale(1); }
 }
 
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
-  20%      { transform: translateX(-6px); }
-  40%      { transform: translateX(6px); }
-  60%      { transform: translateX(-4px); }
-  80%      { transform: translateX(4px); }
+  18%      { transform: translateX(-7px); }
+  36%      { transform: translateX(6px); }
+  54%      { transform: translateX(-4px); }
+  72%      { transform: translateX(3px); }
+  90%      { transform: translateX(-1px); }
 }
 
 @keyframes progressFill {
@@ -290,16 +307,26 @@ a {
 }
 
 @keyframes countUp {
-  from { opacity: 0; transform: scale(0.7); }
-  to   { opacity: 1; transform: scale(1); }
+  from { opacity: 0; transform: scale(0.65) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 @keyframes cardEntrance {
-  from { opacity: 0; transform: translateY(24px) scale(0.97); }
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes glowPulse {
-  0%, 100% { opacity: 0.6; }
+  0%, 100% { opacity: 0.55; }
   50%       { opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-5px); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
 }
