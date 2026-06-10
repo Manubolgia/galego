@@ -1,7 +1,8 @@
 // Galego Service Worker — Cache-first strategy
-const CACHE_NAME = 'galego-v4.1.1';
+const CACHE_NAME = 'galego-v4.1.2';
 
-const PRECACHE_URLS = [
+// Core files — must all cache successfully for the SW to install
+const PRECACHE_CORE = [
   './index.html',
   './manifest.json',
   './css/design-system.css',
@@ -25,6 +26,10 @@ const PRECACHE_URLS = [
   './js/data/exercises_u11u12.js',
   './assets/icon-192.png',
   './assets/icon-512.png',
+];
+
+// Large/optional assets — cached best-effort; failure does not block SW install
+const PRECACHE_OPTIONAL = [
   './vendor/espeak/espeak-ng.js',
   './vendor/espeak/espeak-ng.wasm',
   'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap',
@@ -33,15 +38,17 @@ const PRECACHE_URLS = [
 // ── Install ──────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_URLS.map(url => {
-        return new Request(url, { mode: 'cors' });
-      })).catch(() => {
-        // Retry without cross-origin fonts if it fails
-        const localUrls = PRECACHE_URLS.filter(u => !u.startsWith('http'));
-        return cache.addAll(localUrls);
-      });
-    }).then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then(async (cache) => {
+      // Core files must succeed — if they don't, SW install fails and old SW stays active
+      await cache.addAll(PRECACHE_CORE);
+      // Optional files (large WASM, fonts) are cached best-effort — never block install
+      await Promise.allSettled(
+        PRECACHE_OPTIONAL.map(url =>
+          cache.add(new Request(url, { mode: 'cors' })).catch(() => {})
+        )
+      );
+      self.skipWaiting();
+    })
   );
 });
 
