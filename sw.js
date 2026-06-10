@@ -1,5 +1,5 @@
 // Galego Service Worker — Cache-first strategy
-const CACHE_NAME = 'galego-v4.1.4';
+const CACHE_NAME = 'galego-v4.1.5';
 
 // Core files — must all cache successfully for the SW to install
 const PRECACHE_CORE = [
@@ -39,13 +39,24 @@ const PRECACHE_OPTIONAL = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Core files must succeed — if they don't, SW install fails and old SW stays active
-      await cache.addAll(PRECACHE_CORE);
+      // Fetch each core file fresh from the network, bypassing the HTTP cache,
+      // so a previously-active SW or browser cache can't seed the new cache with
+      // stale file contents. cache: 'reload' forces a network round-trip.
+      await Promise.all(
+        PRECACHE_CORE.map(async (url) => {
+          const resp = await fetch(new Request(url, { cache: 'reload' }));
+          if (!resp.ok) throw new Error('precache failed: ' + url);
+          await cache.put(url, resp);
+        })
+      );
       // Optional files (large WASM, fonts) are cached best-effort — never block install
       await Promise.allSettled(
-        PRECACHE_OPTIONAL.map(url =>
-          cache.add(new Request(url, { mode: 'cors' })).catch(() => {})
-        )
+        PRECACHE_OPTIONAL.map(async (url) => {
+          try {
+            const resp = await fetch(new Request(url, { cache: 'reload', mode: 'cors' }));
+            if (resp.ok || resp.type === 'opaque') await cache.put(url, resp);
+          } catch (_) {}
+        })
       );
       self.skipWaiting();
     })
