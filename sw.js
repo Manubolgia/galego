@@ -1,5 +1,5 @@
 // Galego Service Worker — Cache-first strategy
-const CACHE_NAME = 'galego-v4.1.2';
+const CACHE_NAME = 'galego-v4.1.3';
 
 // Core files — must all cache successfully for the SW to install
 const PRECACHE_CORE = [

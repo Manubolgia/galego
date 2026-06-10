@@ -23,13 +23,25 @@ function _getAudioCtx() {
 // Each call to ESpeakNG() instantiates the WASM, runs main(), and exits —
 // the intended usage pattern per the espeak-ng npm package.
 async function _synthesise(text) {
+  let stderr = '';
   const espeak = await ESpeakNG({
     arguments: ['-v', 'gl', '-w', '/out.wav', '--', text],
     locateFile: LOCATE,
-    print: () => {},
-    printErr: () => {},
+    print: (line) => console.log('[espeak]', line),
+    printErr: (line) => { stderr += line + '\n'; console.warn('[espeak:err]', line); },
   });
-  return espeak.FS.readFile('/out.wav');
+  let wav;
+  try {
+    wav = espeak.FS.readFile('/out.wav');
+  } catch (e) {
+    throw new Error('eSpeak produced no output. stderr:\n' + stderr);
+  }
+  if (!wav || wav.byteLength <= 44) {
+    // 44 bytes = WAV header only, no audio samples
+    throw new Error('eSpeak output empty (' + (wav ? wav.byteLength : 0) + ' bytes). stderr:\n' + stderr);
+  }
+  console.log('[espeak] synthesised', wav.byteLength, 'bytes for:', text);
+  return wav;
 }
 
 async function _decodeAndPlay(wavBytes) {
@@ -61,12 +73,17 @@ async function _playNext() {
     await _decodeAndPlay(wavBytes);
     resolve();
   } catch (e) {
-    _broken = true;
+    console.error('[espeak] synthesis failed:', e);
+    // Only latch as permanently broken if the WASM module itself can't load.
+    // Per-utterance failures (bad voice arg, empty output) should not disable
+    // eSpeak for the rest of the session.
+    if (/locateFile|wasm|instantiate|fetch|import/i.test(String(e && e.message))) {
+      _broken = true;
+    }
     reject(e);
   } finally {
     _currentSource = null;
     _playing = false;
-    // Drain remaining queue with errors if WASM proved broken
     if (_broken) {
       while (_queue.length) _queue.shift().reject(new Error('eSpeak unavailable'));
     } else {
