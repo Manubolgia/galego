@@ -3,7 +3,10 @@
 
 import ESpeakNG from '../vendor/espeak/espeak-ng.js';
 
-const LOCATE = (filename) => `../vendor/espeak/${filename}`;
+// Resolve vendor assets relative to THIS module's URL so it works regardless of
+// the deployment base path (e.g. GitHub Pages project subpath /galego/).
+// tts.js lives at <base>/js/tts.js → WASM is at <base>/vendor/espeak/<file>.
+const LOCATE = (filename) => new URL(`../vendor/espeak/${filename}`, import.meta.url).href;
 
 let _audioCtx = null;
 let _broken = false; // latched true after the first WASM failure
