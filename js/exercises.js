@@ -370,7 +370,7 @@ function renderWordBank(ex, wrap) {
   if (ex.audio) {
     const readingCard = document.createElement('div');
     readingCard.className = 'listening-reading-card hidden';
-    readingCard.textContent = ex.audio;
+    readingCard.textContent = ex.sentence || ex.audio;
 
     const cantListenBtn = document.createElement('button');
     cantListenBtn.className = 'listening-cant-listen-btn';
@@ -379,7 +379,9 @@ function renderWordBank(ex, wrap) {
       readingCard.classList.remove('hidden');
       cantListenBtn.classList.add('hidden');
       const lbl = wrap.querySelector('.exercise-type-label');
-      if (lbl) lbl.textContent = 'Reading';
+      const prompt = wrap.querySelector('.exercise-prompt');
+      if (lbl) lbl.textContent = 'Build the Sentence';
+      if (prompt) prompt.textContent = 'Translate to Galician:';
     });
 
     wrap.appendChild(readingCard);
@@ -560,13 +562,18 @@ function renderListening(ex, wrap) {
   cantListenLink.className = 'listening-cant-listen-btn';
   cantListenLink.textContent = "Can't listen now";
   cantListenLink.addEventListener('click', () => {
-    // Switch to reading mode
     bigBtn.classList.add('hidden');
     hint.classList.add('hidden');
     cantListenLink.classList.add('hidden');
+    if (ex.sentence) {
+      hdr.querySelector('.exercise-type-label').textContent = 'Translate';
+      hdr.querySelector('.exercise-prompt').textContent = 'Translate to Galician:';
+      readingCard.textContent = ex.sentence;
+    } else {
+      hdr.querySelector('.exercise-type-label').textContent = 'Reading';
+    }
     readingCard.classList.remove('hidden');
-    hdr.querySelector('.exercise-type-label').textContent = 'Reading';
-    ta.placeholder = 'Type what you read…';
+    ta.placeholder = ex.sentence ? 'Type your translation…' : 'Type what you read…';
     ta.focus();
   });
 

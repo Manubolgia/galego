@@ -1,89 +1,96 @@
 /* =====================================================
    GALEGO — Design System
-   Galicia-inspired visual language
+   "Atlantic Editorial" — deep ink-teal, single aqua accent,
+   editorial display type, soft tinted depth.
    ===================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 /* === COLOR TOKENS === */
 :root {
-  /* Brand — Atlantic blues */
-  --color-primary-50:  hsl(210, 65%, 96%);
-  --color-primary-100: hsl(210, 65%, 90%);
-  --color-primary-200: hsl(210, 65%, 78%);
-  --color-primary-300: hsl(210, 65%, 65%);
-  --color-primary-400: hsl(210, 65%, 55%);
-  --color-primary-500: hsl(210, 65%, 45%);   /* Main brand */
-  --color-primary-600: hsl(210, 65%, 36%);
-  --color-primary-700: hsl(210, 65%, 28%);
-  --color-primary-800: hsl(210, 65%, 20%);
-  --color-primary-900: hsl(210, 65%, 13%);
+  /* Brand — Atlantic aqua (single considered accent, desaturated) */
+  --color-primary-50:  hsl(188, 52%, 94%);
+  --color-primary-100: hsl(188, 50%, 86%);
+  --color-primary-200: hsl(188, 48%, 74%);
+  --color-primary-300: hsl(188, 46%, 62%);
+  --color-primary-400: hsl(188, 48%, 52%);
+  --color-primary-500: hsl(189, 54%, 43%);   /* Main brand */
+  --color-primary-600: hsl(190, 58%, 34%);
+  --color-primary-700: hsl(191, 56%, 26%);
+  --color-primary-800: hsl(192, 52%, 19%);
+  --color-primary-900: hsl(193, 48%, 13%);
 
-  /* Forest greens */
-  --color-green-50:  hsl(150, 40%, 95%);
-  --color-green-100: hsl(150, 40%, 87%);
-  --color-green-200: hsl(150, 40%, 72%);
-  --color-green-300: hsl(150, 40%, 58%);
-  --color-green-400: hsl(150, 40%, 48%);
-  --color-green-500: hsl(150, 40%, 40%);   /* Success */
-  --color-green-600: hsl(150, 40%, 32%);
+  /* Success — soft sea-green (kept in the same cool family) */
+  --color-green-50:  hsl(162, 38%, 92%);
+  --color-green-100: hsl(162, 36%, 82%);
+  --color-green-200: hsl(162, 36%, 68%);
+  --color-green-300: hsl(162, 40%, 56%);
+  --color-green-400: hsl(162, 44%, 47%);
+  --color-green-500: hsl(163, 48%, 39%);   /* Success */
+  --color-green-600: hsl(164, 46%, 31%);
 
-  /* Warm golds */
-  --color-gold-300: hsl(42, 85%, 65%);
-  --color-gold-400: hsl(42, 85%, 55%);
-  --color-gold-500: hsl(42, 85%, 45%);
+  /* Warm signal — amber (used sparingly for near-miss / mid score) */
+  --color-gold-300: hsl(38, 72%, 66%);
+  --color-gold-400: hsl(36, 70%, 56%);
+  --color-gold-500: hsl(34, 68%, 47%);
 
-  /* Reds */
-  --color-red-50:  hsl(0, 60%, 96%);
-  --color-red-100: hsl(0, 60%, 90%);
-  --color-red-400: hsl(0, 60%, 55%);
-  --color-red-500: hsl(0, 60%, 48%);   /* Error */
-  --color-red-600: hsl(0, 60%, 38%);
+  /* Coral — error (warm but muted, reads against the cool palette) */
+  --color-red-50:  hsl(8, 60%, 94%);
+  --color-red-100: hsl(8, 58%, 86%);
+  --color-red-400: hsl(7, 64%, 60%);
+  --color-red-500: hsl(6, 62%, 52%);   /* Error */
+  --color-red-600: hsl(5, 60%, 42%);
 
-  /* Neutrals — Granite grays */
-  --color-neutral-0:   hsl(220, 25%, 99%);
-  --color-neutral-50:  hsl(220, 20%, 97%);
-  --color-neutral-100: hsl(220, 16%, 93%);
-  --color-neutral-200: hsl(220, 14%, 86%);
-  --color-neutral-300: hsl(220, 12%, 74%);
-  --color-neutral-400: hsl(220, 10%, 58%);
-  --color-neutral-500: hsl(220, 9%, 44%);
-  --color-neutral-600: hsl(220, 10%, 32%);
-  --color-neutral-700: hsl(220, 12%, 22%);
-  --color-neutral-800: hsl(220, 15%, 14%);
-  --color-neutral-900: hsl(220, 18%, 9%);
+  /* Neutrals — single cool-teal-tinted gray family */
+  --color-neutral-0:   hsl(195, 20%, 99%);
+  --color-neutral-50:  hsl(195, 16%, 96%);
+  --color-neutral-100: hsl(195, 14%, 91%);
+  --color-neutral-200: hsl(195, 12%, 83%);
+  --color-neutral-300: hsl(196, 11%, 70%);
+  --color-neutral-400: hsl(197, 10%, 54%);
+  --color-neutral-500: hsl(198, 11%, 40%);
+  --color-neutral-600: hsl(199, 13%, 28%);
+  --color-neutral-700: hsl(200, 16%, 19%);
+  --color-neutral-800: hsl(201, 20%, 13%);
+  --color-neutral-900: hsl(202, 26%, 8%);
 
-  /* Deep ocean backgrounds */
-  --color-ocean-900: hsl(215, 45%, 10%);
-  --color-ocean-800: hsl(215, 40%, 14%);
-  --color-ocean-700: hsl(215, 35%, 18%);
+  /* Deep ink-teal backgrounds — off-black, never pure navy */
+  --color-ocean-900: hsl(200, 30%, 7%);
+  --color-ocean-800: hsl(200, 26%, 10%);
+  --color-ocean-700: hsl(199, 22%, 14%);
 
   /* === SEMANTIC COLORS === */
   --color-bg:            var(--color-ocean-900);
   --color-bg-surface:    var(--color-ocean-800);
-  --color-bg-elevated:   var(--color-ocean-700);
-  --color-bg-card:       hsl(215, 32%, 16%);
-  --color-bg-input:      hsl(215, 28%, 20%);
+  --color-bg-elevated:   hsl(199, 20%, 16%);
+  --color-bg-card:       hsl(200, 22%, 12%);
+  --color-bg-input:      hsl(200, 20%, 15%);
 
-  --color-text-primary:  hsl(220, 20%, 95%);
-  --color-text-secondary: hsl(220, 12%, 68%);
-  --color-text-tertiary: hsl(220, 10%, 48%);
-  --color-text-inverse:  hsl(220, 18%, 9%);
+  --color-text-primary:  hsl(190, 24%, 96%);
+  --color-text-secondary: hsl(196, 14%, 70%);
+  --color-text-tertiary: hsl(198, 12%, 50%);
+  --color-text-inverse:  hsl(202, 30%, 7%);
 
-  --color-border:        hsl(215, 25%, 24%);
+  /* Hairlines — barely-there light edges, not gray strokes */
+  --color-border:        hsl(198, 18%, 20%);
+  --color-hairline:      hsla(190, 40%, 80%, 0.08);
   --color-border-focus:  var(--color-primary-400);
 
-  --color-correct:       var(--color-green-500);
-  --color-correct-bg:    hsl(150, 40%, 12%);
-  --color-correct-border: hsl(150, 40%, 25%);
+  --color-correct:       var(--color-green-400);
+  --color-correct-bg:    hsl(163, 44%, 11%);
+  --color-correct-border: hsla(162, 44%, 50%, 0.28);
 
   --color-incorrect:     var(--color-red-500);
-  --color-incorrect-bg:  hsl(0, 60%, 10%);
-  --color-incorrect-border: hsl(0, 60%, 25%);
+  --color-incorrect-bg:  hsl(6, 50%, 11%);
+  --color-incorrect-border: hsla(7, 62%, 58%, 0.28);
 
   /* === TYPOGRAPHY === */
-  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-lang: 'Merriweather', Georgia, 'Times New Roman', serif;
+  /* Display: Bricolage Grotesque (character, optical sizing).
+     Language samples: Fraunces (editorial serif).
+     Body/UI: Plus Jakarta Sans. */
+  --font-ui: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: 'Bricolage Grotesque', var(--font-ui);
+  --font-lang: 'Fraunces', Georgia, 'Times New Roman', serif;
 
   --text-xs:   0.75rem;   /* 12px */
   --text-sm:   0.875rem;  /* 14px */
@@ -93,6 +100,7 @@
   --text-2xl:  1.5rem;    /* 24px */
   --text-3xl:  1.875rem;  /* 30px */
   --text-4xl:  2.25rem;   /* 36px */
+  --text-5xl:  3rem;      /* 48px */
 
   --font-weight-regular:  400;
   --font-weight-medium:   500;
@@ -121,26 +129,29 @@
   --space-20: 5rem;      /* 80px */
 
   /* === BORDER RADIUS === */
-  --radius-sm:   6px;
-  --radius-md:   10px;
-  --radius-lg:   14px;
-  --radius-xl:   20px;
-  --radius-2xl:  28px;
+  /* Concentric scale — containers soft, inner elements tighter */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   22px;
+  --radius-2xl:  30px;
   --radius-full: 9999px;
 
   /* === SHADOWS === */
-  --shadow-sm:  0 1px 2px rgba(0,0,0,0.25), 0 1px 4px rgba(0,0,0,0.15);
-  --shadow-md:  0 2px 8px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.2);
-  --shadow-lg:  0 6px 20px rgba(0,0,0,0.38), 0 2px 8px rgba(0,0,0,0.22);
-  --shadow-xl:  0 12px 40px rgba(0,0,0,0.5), 0 4px 16px rgba(0,0,0,0.3);
+  /* Tinted with the background hue (ink-teal) instead of pure black —
+     soft, diffuse, single top-light source. */
+  --shadow-sm:  0 1px 2px hsla(200, 50%, 3%, 0.4), 0 2px 6px hsla(200, 45%, 4%, 0.28);
+  --shadow-md:  0 4px 14px hsla(200, 50%, 3%, 0.42), 0 8px 28px hsla(200, 45%, 4%, 0.3);
+  --shadow-lg:  0 10px 30px hsla(200, 52%, 3%, 0.5), 0 4px 14px hsla(200, 45%, 4%, 0.32);
+  --shadow-xl:  0 22px 60px hsla(200, 55%, 2%, 0.62), 0 8px 24px hsla(200, 48%, 4%, 0.4);
 
   /* Inset light-edge on elevated surfaces — simulates top light source */
-  --shadow-inset-top: inset 0 1px 0 rgba(255,255,255,0.07);
+  --shadow-inset-top: inset 0 1px 0 hsla(190, 60%, 88%, 0.08);
 
-  /* Colored ambient glows */
-  --shadow-glow-primary:   0 0 20px hsla(210, 65%, 50%, 0.35), 0 4px 12px rgba(0,0,0,0.3);
-  --shadow-glow-correct:   0 0 18px hsla(150, 40%, 42%, 0.4), 0 4px 12px rgba(0,0,0,0.25);
-  --shadow-glow-incorrect: 0 0 18px hsla(0, 60%, 48%, 0.38), 0 4px 12px rgba(0,0,0,0.25);
+  /* Colored ambient glows — desaturated aqua, used sparingly */
+  --shadow-glow-primary:   0 0 24px hsla(189, 60%, 48%, 0.28), 0 6px 18px hsla(200, 50%, 3%, 0.4);
+  --shadow-glow-correct:   0 0 22px hsla(162, 50%, 46%, 0.3), 0 6px 16px hsla(200, 50%, 3%, 0.32);
+  --shadow-glow-incorrect: 0 0 22px hsla(7, 62%, 56%, 0.28), 0 6px 16px hsla(200, 50%, 3%, 0.32);
 
   /* === TRANSITIONS === */
   /* Press: snappy. Release/enter: spring-like overshoot feel via cubic-bezier */
@@ -190,7 +201,27 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  font-feature-settings: "ss01", "cv01";
 }
+
+/* Fixed grain overlay — breaks digital flatness without GPU cost.
+   pointer-events:none + fixed = no repaint on scroll. */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Headings default to balanced wrapping — no orphans */
+h1, h2, h3 { text-wrap: balance; }
+
+/* Numbers use tabular figures for steady alignment */
+.tabular { font-variant-numeric: tabular-nums; }
 
 img, video {
   max-width: 100%;
@@ -261,8 +292,8 @@ a {
 }
 
 @keyframes pulse {
-  0%, 100% { box-shadow: 0 0 0 0 hsla(210, 65%, 50%, 0.5); }
-  50%       { box-shadow: 0 0 0 7px hsla(210, 65%, 50%, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 hsla(189, 64%, 50%, 0.5); }
+  50%       { box-shadow: 0 0 0 7px hsla(189, 64%, 50%, 0); }
 }
 
 @keyframes spinCount {
@@ -329,4 +360,26 @@ a {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
+}
+
+/* Premium entrance — heavy fade-up with a soft blur resolve */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(18px); filter: blur(6px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+
+/* Slow ambient drift for atmospheric glows */
+@keyframes drift {
+  0%, 100% { transform: translate(-50%, 0) scale(1); opacity: 0.7; }
+  50%      { transform: translate(-50%, -8px) scale(1.06); opacity: 1; }
+}
+
+/* Respect users who ask for less motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -13,6 +13,7 @@ import {
   startLesson, getProgress, submitAnswer, advance,
   showAnswerFeedback
 } from './exercises.js';
+import { haptics, installGlobalHaptics } from './haptics.js';
 
 // ── Screen management ──────────────────────────────────────────
 const SCREENS = ['login','home','unit','lesson'];
@@ -326,7 +327,7 @@ function showContextMenu(dotEl, unitId, lessonId, isCompleted) {
   menu.classList.remove('hidden');
 
   // Haptic feedback on mobile
-  if (navigator.vibrate) navigator.vibrate(30);
+  haptics.medium();
 
   markBtn.onclick = () => {
     markLessonDone(unitId, lessonId);
@@ -576,6 +577,7 @@ function initLesson(unitId, lessonId) {
   _lessonMode = 'answering';
 
   const ex = startLesson(lessonId, (result) => {
+    haptics.complete();
     saveLessonScore(unitId, lessonId, result.score);
     clearCurrentLesson();
     navigate('unit', { unitId, unit: getUnit(unitId) });
@@ -614,6 +616,7 @@ function doCheck() {
 
   if (result.nearMiss) {
     // Almost correct — show hint, let user retry same exercise
+    haptics.nearMiss();
     showFeedback(null, result.correctAnswer, true);
     const btn = document.getElementById('lesson-action-btn');
     btn.textContent = 'Try Again';
@@ -622,6 +625,7 @@ function doCheck() {
     return;
   }
 
+  haptics[result.correct ? 'success' : 'error']();
   showAnswerFeedback(result.correct, result.exercise);
   showFeedback(result.correct, result.correctAnswer);
 
@@ -691,6 +695,7 @@ import { renderExercise } from './exercises.js';
 // ── Init ───────────────────────────────────────────────────────
 export async function init() {
   await initAudio();
+  installGlobalHaptics();
 
   document.getElementById('exit-confirm-btn').onclick = () => {
     document.getElementById('exit-modal').classList.add('hidden');
