@@ -1,31 +1,10 @@
 // Galego — Exercise Engine
 import { getLessonExercises } from './data/exercises.js';
-import { speak as wsSpeak, stop as wsStop } from './audio.js';
-import { speak as eSpeakSpeak, cancel as eSpeakCancel } from './tts.js';
 
-// Try eSpeak-ng first; fall back to Web Speech API if it fails or is unavailable.
-async function speak(text, onStart, onEnd) {
-  let usedEspeak = false;
-  try {
-    if (text) {
-      if (onStart) onStart();
-      await eSpeakSpeak(text);
-      usedEspeak = true;
-    }
-  } catch (_) {
-    usedEspeak = false;
-  }
-  if (!usedEspeak) {
-    wsSpeak(text, onStart, onEnd);
-    return;
-  }
-  if (onEnd) onEnd();
-}
-
-function cancelSpeech() {
-  eSpeakCancel();
-  wsStop();
-}
+// TTS stub — wire up a real speak(text) implementation here when ready.
+// See js/audio.js for the Web Speech API skeleton (or swap in a WASM engine).
+// eslint-disable-next-line no-unused-vars
+function speak(_text, _onStart, _onEnd) { if (_onEnd) _onEnd(); }
 
 let _state = null; // { exercises, index, correct, wrong[], answers }
 let _onComplete = null;
@@ -173,9 +152,6 @@ export function renderExercise() {
   }
 
   container.appendChild(wrap);
-  if (ex.audio && ex.type !== 'listening') {
-    setTimeout(() => speak(ex.audio), 400);
-  }
   return ex;
 }
 
@@ -249,27 +225,7 @@ function header(ex, label) {
   div.className = 'exercise-header';
   div.innerHTML = `<div class="exercise-type-label">${label}</div>
     <div class="exercise-prompt">${ex.prompt}</div>`;
-  if (ex.audio) {
-    const row = document.createElement('div');
-    row.className = 'exercise-audio-row';
-    row.appendChild(audioBtn(ex.audio));
-    div.appendChild(row);
-  }
   return div;
-}
-
-function audioBtn(text) {
-  const btn = document.createElement('button');
-  btn.className = 'audio-btn';
-  btn.setAttribute('aria-label', 'Play audio');
-  btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
-  btn.addEventListener('click', () => {
-    btn.classList.add('playing');
-    speak(text, null, () => btn.classList.remove('playing'));
-  });
-  return btn;
 }
 
 function enableCheck(enabled) {
@@ -391,27 +347,6 @@ function renderWordBank(ex, wrap) {
   wrap.appendChild(sentenceBox);
   wrap.appendChild(divider);
   wrap.appendChild(pool);
-
-  if (ex.audio) {
-    const readingCard = document.createElement('div');
-    readingCard.className = 'listening-reading-card hidden';
-    readingCard.textContent = ex.sentence || ex.audio;
-
-    const cantListenBtn = document.createElement('button');
-    cantListenBtn.className = 'listening-cant-listen-btn';
-    cantListenBtn.textContent = "Can't listen now";
-    cantListenBtn.addEventListener('click', () => {
-      readingCard.classList.remove('hidden');
-      cantListenBtn.classList.add('hidden');
-      const lbl = wrap.querySelector('.exercise-type-label');
-      const prompt = wrap.querySelector('.exercise-prompt');
-      if (lbl) lbl.textContent = 'Build the Sentence';
-      if (prompt) prompt.textContent = 'Translate to Galician:';
-    });
-
-    wrap.appendChild(readingCard);
-    wrap.appendChild(cantListenBtn);
-  }
 
   enableCheck(false);
   window._currentAnswer = [];
@@ -540,82 +475,16 @@ function renderMatching(ex, wrap) {
   window._currentAnswer = null;
 }
 
-// Listening
+// Listening — rendered as a translation exercise until TTS is available.
+// When a real speak() is wired in, restore the speaker UI here.
 function renderListening(ex, wrap) {
-  const hdr = document.createElement('div');
-  hdr.className = 'exercise-header';
-  hdr.innerHTML = `<div class="exercise-type-label">Listening</div>
-    <div class="exercise-prompt">${ex.prompt}</div>`;
-  wrap.appendChild(hdr);
-
-  const section = document.createElement('div');
-  section.className = 'listening-exercise';
-
-  const bigBtn = document.createElement('button');
-  bigBtn.className = 'listening-speaker-btn';
-  bigBtn.setAttribute('aria-label', 'Play audio');
-  bigBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
-    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>`;
-  bigBtn.addEventListener('click', () => {
-    bigBtn.classList.add('playing');
-    speak(ex.audio, null, () => bigBtn.classList.remove('playing'));
-  });
-
-  const hint = document.createElement('div');
-  hint.className = 'listening-hint';
-  hint.textContent = 'Tap the speaker, then type what you hear';
-
-  const inputArea = document.createElement('div');
-  inputArea.className = 'listening-input-area translate-input-area';
-  const ta = document.createElement('textarea');
-  ta.className = 'translate-textarea';
-  ta.placeholder = 'Type what you hear…';
-  ta.rows = 2;
-  ta.addEventListener('input', () => {
-    enableCheck(ta.value.trim().length > 0);
-    window._currentAnswer = ta.value.trim();
-  });
-  inputArea.appendChild(ta);
-
-  // Reading fallback card (hidden initially)
-  const readingCard = document.createElement('div');
-  readingCard.className = 'listening-reading-card hidden';
-  readingCard.textContent = ex.audio;
-
-  const cantListenLink = document.createElement('button');
-  cantListenLink.className = 'listening-cant-listen-btn';
-  cantListenLink.textContent = "Can't listen now";
-  cantListenLink.addEventListener('click', () => {
-    bigBtn.classList.add('hidden');
-    hint.classList.add('hidden');
-    cantListenLink.classList.add('hidden');
-    if (ex.sentence) {
-      hdr.querySelector('.exercise-type-label').textContent = 'Translate';
-      hdr.querySelector('.exercise-prompt').textContent = 'Translate to Galician:';
-      readingCard.textContent = ex.sentence;
-    } else {
-      hdr.querySelector('.exercise-type-label').textContent = 'Reading';
-    }
-    readingCard.classList.remove('hidden');
-    ta.placeholder = ex.sentence ? 'Type your translation…' : 'Type what you read…';
-    ta.focus();
-  });
-
-  section.appendChild(bigBtn);
-  section.appendChild(hint);
-  section.appendChild(readingCard);
-  section.appendChild(inputArea);
-  section.appendChild(cantListenLink);
-  wrap.appendChild(section);
-
-  enableCheck(false);
-  window._currentAnswer = '';
-  // Auto-play on load
-  setTimeout(() => {
-    bigBtn.classList.add('playing');
-    speak(ex.audio, null, () => bigBtn.classList.remove('playing'));
-  }, 500);
+  const translateEx = {
+    ...ex,
+    type: 'translate_type',
+    prompt: ex.sentence ? 'Translate to Galician:' : ex.prompt,
+    sourceText: ex.sentence || ex.audio,
+  };
+  renderTranslate(translateEx, wrap);
 }
 
 // ── Mark answer correct/incorrect visually ─────────────────────

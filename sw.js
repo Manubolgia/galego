@@ -1,8 +1,7 @@
 // Galego Service Worker — Cache-first strategy
-const CACHE_NAME = 'galego-v4.1.5';
+const CACHE_NAME = 'galego-v4.2.0';
 
-// Core files — must all cache successfully for the SW to install
-const PRECACHE_CORE = [
+const PRECACHE = [
   './index.html',
   './manifest.json',
   './css/design-system.css',
@@ -12,8 +11,6 @@ const PRECACHE_CORE = [
   './js/app.js',
   './js/state.js',
   './js/exercises.js',
-  './js/audio.js',
-  './js/tts.js',
   './js/haptics.js',
   './js/data/course.js',
   './js/data/vocabulary.js',
@@ -28,34 +25,16 @@ const PRECACHE_CORE = [
   './assets/icon-512.png',
 ];
 
-// Large/optional assets — cached best-effort; failure does not block SW install
-const PRECACHE_OPTIONAL = [
-  './vendor/espeak/espeak-ng.js',
-  './vendor/espeak/espeak-ng.wasm',
-  'https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap',
-];
-
 // ── Install ──────────────────────────────────────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      // Fetch each core file fresh from the network, bypassing the HTTP cache,
-      // so a previously-active SW or browser cache can't seed the new cache with
-      // stale file contents. cache: 'reload' forces a network round-trip.
+      // Fetch fresh from network so a stale active SW can't seed the new cache.
       await Promise.all(
-        PRECACHE_CORE.map(async (url) => {
+        PRECACHE.map(async (url) => {
           const resp = await fetch(new Request(url, { cache: 'reload' }));
           if (!resp.ok) throw new Error('precache failed: ' + url);
           await cache.put(url, resp);
-        })
-      );
-      // Optional files (large WASM, fonts) are cached best-effort — never block install
-      await Promise.allSettled(
-        PRECACHE_OPTIONAL.map(async (url) => {
-          try {
-            const resp = await fetch(new Request(url, { cache: 'reload', mode: 'cors' }));
-            if (resp.ok || resp.type === 'opaque') await cache.put(url, resp);
-          } catch (_) {}
         })
       );
       self.skipWaiting();

@@ -1,6 +1,5 @@
 // Galego — App Router & Screen Manager
 import { COURSE, getUnit } from './data/course.js';
-import { init as initAudio } from './audio.js';
 import {
   isLessonRecommended, isLessonCompleted, getLessonScore,
   getUnitProgress, saveLessonScore, clearCurrentLesson,
@@ -694,7 +693,6 @@ import { renderExercise } from './exercises.js';
 
 // ── Init ───────────────────────────────────────────────────────
 export async function init() {
-  await initAudio();
   installGlobalHaptics();
 
   document.getElementById('exit-confirm-btn').onclick = () => {
