@@ -301,15 +301,27 @@
   cursor: default;
 }
 
+/* the real tile is hidden while its ghost floats; the gap holds its slot */
 .word-tile.dragging {
-  opacity: 0.35;
-  pointer-events: none;
+  display: none;
 }
 
-.word-tile.drag-over {
-  border-color: var(--color-primary-300);
-  background: hsla(189, 54%, 45%, 0.22);
-  transform: scale(1.06);
+/* placeholder slot that slides between tiles to show the drop position */
+.word-tile.drag-gap {
+  border: 1.5px dashed var(--color-primary-400);
+  background: hsla(189, 54%, 45%, 0.1);
+  box-shadow: none;
+  pointer-events: none;
+  animation: none;
+}
+
+/* tiles glide as the gap pushes them around */
+.word-bank-sentence .word-tile.in-sentence:not(.dragging) {
+  transition:
+    transform var(--transition-base) var(--ease-out-expo),
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .word-tile.drag-ghost {

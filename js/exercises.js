@@ -348,6 +348,9 @@ function renderWordBank(ex, wrap) {
     });
 
     // ── drag to reorder (pointer events, works mouse + touch) ──
+    // Live reordering: the dragged tile follows the cursor as a floating
+    // ghost while a placeholder gap slides between the other tiles to show
+    // where it will land. Letting go drops it into that gap.
     sentTile.addEventListener('pointerdown', e => {
       if (e.button !== undefined && e.button !== 0) return;
       e.stopPropagation();
@@ -356,6 +359,7 @@ function renderWordBank(ex, wrap) {
       const startY = e.clientY;
       let dragging = false;
       let ghost = null;
+      let gap = null; // placeholder occupying the drop slot
       sentTile._dragged = false;
 
       const DRAG_THRESHOLD = 6; // px before we commit to drag
@@ -364,14 +368,24 @@ function renderWordBank(ex, wrap) {
         dragging = true;
         sentTile._dragged = true;
         sentTile.setPointerCapture(e.pointerId);
-        sentTile.classList.add('dragging');
 
+        const r = sentTile.getBoundingClientRect();
+
+        // floating ghost that tracks the cursor
         ghost = document.createElement('div');
         ghost.className = 'word-tile drag-ghost';
         ghost.textContent = word;
-        const r = sentTile.getBoundingClientRect();
         ghost.style.cssText = `width:${r.width}px;height:${r.height}px;top:${r.top + window.scrollY}px;left:${r.left}px;`;
         document.body.appendChild(ghost);
+
+        // gap placeholder takes the dragged tile's place in the flow;
+        // we hide the real tile but keep it in the DOM as the drop anchor
+        gap = document.createElement('div');
+        gap.className = 'word-tile drag-gap';
+        gap.style.width = r.width + 'px';
+        gap.style.height = r.height + 'px';
+        sentenceBox.insertBefore(gap, sentTile);
+        sentTile.classList.add('dragging'); // visually hidden via CSS
       }
 
       function onMove(ev) {
@@ -383,17 +397,29 @@ function renderWordBank(ex, wrap) {
         ghost.style.top  = (ev.clientY - r.height / 2 + window.scrollY) + 'px';
         ghost.style.left = (ev.clientX - r.width  / 2) + 'px';
 
-        // find tile under cursor (ignore ghost + dragged tile)
-        ghost.style.pointerEvents = 'none';
-        const under = document.elementFromPoint(ev.clientX, ev.clientY);
-        ghost.style.pointerEvents = '';
-
-        const target = under && under.closest('.word-tile.in-sentence');
-        sentenceBox.querySelectorAll('.word-tile.in-sentence').forEach(t => t.classList.remove('drag-over'));
-        if (target && target !== sentTile) target.classList.add('drag-over');
+        // move the gap to wherever the cursor currently is among the tiles
+        const before = tileAfter(ev.clientX, ev.clientY);
+        if (before !== gap) {
+          if (before) sentenceBox.insertBefore(gap, before);
+          else sentenceBox.appendChild(gap);
+        }
       }
 
-      function onUp(ev) {
+      // returns the tile that the gap should sit *before* for the current
+      // cursor position, or null to append at the end
+      function tileAfter(x, y) {
+        const tiles = [...sentenceBox.querySelectorAll('.word-tile.in-sentence')]
+          .filter(t => t !== sentTile);
+        for (const t of tiles) {
+          const r = t.getBoundingClientRect();
+          // insert before the first tile whose horizontal+vertical midpoint
+          // the cursor hasn't passed (row-aware)
+          if (y < r.bottom && x < r.left + r.width / 2) return t;
+        }
+        return null;
+      }
+
+      function onUp() {
         sentTile.removeEventListener('pointermove', onMove);
         sentTile.removeEventListener('pointerup', onUp);
         sentTile.removeEventListener('pointercancel', onUp);
@@ -402,34 +428,19 @@ function renderWordBank(ex, wrap) {
         dragging = false;
         sentTile.classList.remove('dragging');
         if (ghost) { ghost.remove(); ghost = null; }
-        sentenceBox.querySelectorAll('.drag-over').forEach(t => t.classList.remove('drag-over'));
 
-        ghost && ghost.remove();
-        ghost = null;
-
-        // find drop target
-        const under = document.elementFromPoint(ev.clientX, ev.clientY);
-        const target = under && under.closest('.word-tile.in-sentence');
-        if (target && target !== sentTile) {
-          // swap in chosen array
-          const aIdx = chosen.indexOf(sentTile);
-          const bIdx = chosen.indexOf(target);
-          if (aIdx > -1 && bIdx > -1) {
-            [chosen[aIdx], chosen[bIdx]] = [chosen[bIdx], chosen[aIdx]];
-            // swap in DOM
-            const aNext = sentTile.nextSibling;
-            const bNext = target.nextSibling;
-            if (aNext === target) {
-              sentenceBox.insertBefore(target, sentTile);
-            } else if (bNext === sentTile) {
-              sentenceBox.insertBefore(sentTile, target);
-            } else {
-              sentenceBox.insertBefore(target, aNext);
-              sentenceBox.insertBefore(sentTile, bNext);
-            }
-            syncAnswer();
-          }
+        // drop the real tile where the gap is, then remove the gap
+        if (gap) {
+          sentenceBox.insertBefore(sentTile, gap);
+          gap.remove();
+          gap = null;
         }
+
+        // rebuild chosen[] from the live DOM order
+        chosen.length = 0;
+        sentenceBox.querySelectorAll('.word-tile.in-sentence')
+          .forEach(t => chosen.push(t));
+        syncAnswer();
 
         // reset _dragged flag after the click event fires
         setTimeout(() => { sentTile._dragged = false; }, 0);
