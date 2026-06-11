@@ -382,8 +382,6 @@ a {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-  /* Results screen: no motion — show final state instantly, no confetti */
-  .confetti-layer { display: none !important; }
+  /* Results screen: no motion — show final state instantly */
   .results-percent.pop { animation: none !important; }
-  .mascot-rig, .mascot-shadow { animation: none !important; }
 }

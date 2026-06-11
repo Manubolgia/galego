@@ -1,5 +1,6 @@
 // Galego — Exercise Engine
 import { getLessonExercises } from './data/exercises.js';
+import { flyFrom, burst } from './fx.js';
 
 // TTS stub — wire up a real speak(text) implementation here when ready.
 // See js/audio.js for the Web Speech API skeleton (or swap in a WASM engine).
@@ -320,10 +321,13 @@ function renderWordBank(ex, wrap) {
   }
 
   function removeSentTile(sentTile) {
+    const fromRect = sentTile.getBoundingClientRect();
     const idx = chosen.indexOf(sentTile);
     if (idx > -1) chosen.splice(idx, 1);
     sentTile.remove();
     sentTile._poolTile.classList.remove('used');
+    // FLIP: the pool tile flies back from where the sentence tile was
+    flyFrom(sentTile._poolTile, fromRect);
     if (sentenceBox.querySelectorAll('.word-tile').length === 0) {
       sentenceBox.appendChild(placeholder);
     }
@@ -447,11 +451,16 @@ function renderWordBank(ex, wrap) {
     tile.dataset.word = word;
     tile.addEventListener('click', () => {
       if (tile.classList.contains('used')) return;
+      const fromRect = tile.getBoundingClientRect();
       tile.classList.add('used');
       const sentTile = makeSentTile(word, tile);
+      // each placed tile settles at its own slight tilt — real weight
+      sentTile.style.setProperty('--tile-tilt', `${(Math.random() * 4 - 2).toFixed(1)}deg`);
       placeholder.remove();
       chosen.push(sentTile);
       sentenceBox.appendChild(sentTile);
+      // FLIP: spring-fly from the pool slot into the sentence
+      flyFrom(sentTile, fromRect);
       syncAnswer();
     });
     pool.appendChild(tile);
@@ -546,6 +555,9 @@ function renderMatching(ex, wrap) {
         if (b.dataset.value === leftVal || b.dataset.value === rightVal) {
           b.classList.remove('selected', 'wrong');
           b.classList.add('matched');
+          // tiny celebratory pop at each matched tile
+          const r = b.getBoundingClientRect();
+          burst(r.left + r.width / 2, r.top + r.height / 2, { count: 7, speed: 170 });
         }
       });
       clearSelection();

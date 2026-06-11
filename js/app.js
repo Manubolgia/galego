@@ -13,6 +13,12 @@ import {
   showAnswerFeedback
 } from './exercises.js';
 import { haptics, installGlobalHaptics } from './haptics.js';
+import {
+  screenTransition, animateSpring, prefersReducedMotion,
+  burst, confetti, ripple, flash, crack,
+} from './fx.js';
+import { renderPathHome, teardownPathHome } from './path.js';
+import { createMascot } from './mascot.js';
 
 // ── Screen management ──────────────────────────────────────────
 const SCREENS = ['login','home','unit','lesson','results'];
@@ -21,7 +27,27 @@ const SCREENS = ['login','home','unit','lesson','results'];
 let _lastSyncStatus = 'idle';
 let _lastSyncMessage = '';
 
+// Screen-to-screen navigation, wrapped in a View Transition when the
+// browser supports it (shared-element morphs + tap-point bloom).
+// params.tapPoint {x,y} → color blooms from the tap.
+// params.morphUnitId → on home, the unit node morphs back from the hero.
 export function navigate(screenId, params = {}) {
+  const run = () => applyNavigate(screenId, params);
+  const vtPromise = screenTransition(run, { bloomFrom: params.tapPoint || null });
+  // After a morph, no path node may keep the shared-element name —
+  // duplicates would break the next transition.
+  Promise.resolve(vtPromise).then((vt) => {
+    const clear = () => document.querySelectorAll('.path-node').forEach(
+      (n) => { n.style.viewTransitionName = ''; }
+    );
+    if (vt && vt.finished) vt.finished.finally(clear);
+    else clear();
+  }).catch(() => {});
+}
+
+function applyNavigate(screenId, params = {}) {
+  if (screenId !== 'home') teardownPathHome();
+
   SCREENS.forEach(id => {
     const el = document.getElementById(`screen-${id}`);
     if (el) el.classList.add('hidden');
@@ -37,9 +63,9 @@ export function navigate(screenId, params = {}) {
     topBar.classList.add('hidden');
   } else {
     topBar.classList.remove('hidden');
-    if (screenId === 'unit' && params.unit) {
-      topTitle.textContent = params.unit.title;
-      backBtn.onclick = () => navigate('home');
+    if (screenId === 'unit' && params.unitId) {
+      topTitle.textContent = (params.unit && params.unit.title) || getUnit(params.unitId)?.title || '';
+      backBtn.onclick = () => navigate('home', { morphUnitId: params.unitId });
       backBtn.style.visibility = 'visible';
     } else if (screenId === 'lesson' || screenId === 'results') {
       topTitle.textContent = '';
@@ -52,11 +78,10 @@ export function navigate(screenId, params = {}) {
   hideSettingsPanel();
 
   if (screenId === 'login') renderLogin();
-  if (screenId === 'home') renderHome();
+  if (screenId === 'home') renderHome(params);
   if (screenId === 'unit' && params.unitId) renderUnit(params.unitId);
   if (screenId === 'lesson' && params.lessonId) initLesson(params.unitId, params.lessonId);
   if (screenId === 'results') renderResults(params);
-
 }
 
 // ── Login screen ───────────────────────────────────────────────
@@ -117,55 +142,33 @@ function setupLoginListeners() {
   });
 }
 
-// ── Home screen ────────────────────────────────────────────────
-function renderHome() {
-  const list = document.getElementById('units-list');
-  list.innerHTML = '';
-
-  // Update sync indicator
+// ── Home screen — the Camiño ───────────────────────────────────
+function renderHome(params = {}) {
   updateSyncIndicator();
 
-  COURSE.forEach((unit, i) => {
-    const prog = getUnitProgress(unit.id, COURSE);
-    const recommended = isUnitRecommended(unit.id, COURSE);
+  const screen = document.getElementById('screen-home');
+  const totalLessons = COURSE.reduce((n, u) => n + u.lessons.length, 0);
+  const totalEl = document.getElementById('stat-lessons-total');
+  if (totalEl) totalEl.textContent = `/${totalLessons}`;
 
-    const card = document.createElement('div');
-    card.className = `unit-card${!recommended ? ' not-recommended' : ''}`;
-    card.style.animationDelay = `${i * 60}ms`;
-    card.setAttribute('role', 'button');
-    card.setAttribute('aria-label', unit.title);
-
-    const pct = prog.percentage;
-    const circumference = 126.9;
-    const offset = circumference - (circumference * pct / 100);
-
-    card.innerHTML = `
-      <div class="unit-card-emoji">${unit.icon}</div>
-      <div class="unit-card-info">
-        <div class="unit-card-label">Unit ${i + 1} · <span class="unit-level-badge">${unit.level}</span></div>
-        <div class="unit-card-title">${unit.title}</div>
-        <div class="unit-card-subtitle">${unit.subtitle}</div>
-      </div>
-      <div class="unit-card-progress">
-        <div class="progress-ring">
-          <svg viewBox="0 0 44 44">
-            <circle class="progress-ring-track" cx="22" cy="22" r="20.2"/>
-            <circle class="progress-ring-fill${pct===100?' complete':''}" cx="22" cy="22" r="20.2"
-              style="stroke-dashoffset:${offset}"/>
-          </svg>
-          <div class="progress-ring-text">${pct===100?'✓':pct>0?pct+'%':prog.completed+'/'+prog.total}</div>
-        </div>
-      </div>`;
-
-    // All units are always clickable — skip-ahead warning for non-recommended units
-    card.addEventListener('click', () => {
-      if (!recommended) {
-        showSkipWarning(() => navigate('unit', { unitId: unit.id, unit }));
-      } else {
-        navigate('unit', { unitId: unit.id, unit });
-      }
-    });
-    list.appendChild(card);
+  renderPathHome(screen, {
+    course: COURSE,
+    getUnitProgress,
+    isUnitRecommended: (id) => isUnitRecommended(id, COURSE),
+    morphUnitId: params.morphUnitId || null,
+    onUnitTap(unit, nodeEl, e) {
+      haptics.medium();
+      const tapPoint = (e && typeof e.clientX === 'number')
+        ? { x: e.clientX, y: e.clientY } : null;
+      const go = () => {
+        // this node becomes the shared element that morphs into the unit hero
+        document.querySelectorAll('.path-node').forEach((n) => { n.style.viewTransitionName = ''; });
+        nodeEl.style.viewTransitionName = 'unit-hero';
+        navigate('unit', { unitId: unit.id, unit, tapPoint });
+      };
+      if (!isUnitRecommended(unit.id, COURSE)) showSkipWarning(go);
+      else go();
+    },
   });
 }
 
@@ -181,9 +184,10 @@ function renderUnit(unitId) {
   // Grammar tips
   const tipsContainer = document.getElementById('grammar-tips-container');
   tipsContainer.innerHTML = '';
-  unit.grammarTips.forEach(tip => {
+  unit.grammarTips.forEach((tip, ti) => {
     const card = document.createElement('div');
-    card.className = 'grammar-card';
+    card.className = 'grammar-card enter';
+    card.style.animationDelay = `${200 + ti * 90}ms`;
     card.innerHTML = `
       <div class="grammar-card-header">
         <div class="grammar-card-title">${tip.title}</div>
@@ -214,7 +218,8 @@ function renderUnit(unitId) {
     const score = getLessonScore(unitId, lessonId);
 
     const wrapper = document.createElement('div');
-    wrapper.className = 'lesson-dot-wrapper';
+    wrapper.className = 'lesson-dot-wrapper enter';
+    wrapper.style.animationDelay = `${60 + i * 55}ms`;
 
     const dot = document.createElement('button');
     dot.setAttribute('aria-label', `Lesson ${i + 1}`);
@@ -319,97 +324,106 @@ function tierForScore(score) {
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
+function starsForScore(score) {
+  return score >= 85 ? 3 : score >= 65 ? 2 : score >= 40 ? 1 : 0;
+}
+
+const STAR_PATH = 'M12 1.8l3 6.4 6.8.9-5 4.8 1.3 6.7L12 17.3 5.9 20.6l1.3-6.7-5-4.8 6.8-.9z';
+
+let _resultsBreo = null;
+let _resultsTimers = [];
+
 function renderResults({ unitId, score = 0, correct = 0, total = 0 }) {
   const tier = tierForScore(score);
+  _resultsTimers.forEach(clearTimeout);
+  _resultsTimers = [];
 
-  // Mascot mood
-  const mascot = document.getElementById('mascot');
-  mascot.className = `mascot mood-${tier}`;
+  // ── Stars: staggered pop, score-keyed ────────────────────────
+  const earned = starsForScore(score);
+  const starsWrap = document.getElementById('results-stars');
+  starsWrap.querySelectorAll('.results-star').forEach((s) => s.remove());
+  for (let i = 0; i < 3; i++) {
+    const star = document.createElement('div');
+    star.className = `results-star s${i + 1}${i < earned ? ' earned' : ''}`;
+    star.innerHTML = `<svg viewBox="0 0 24 24"><path class="star-shape" d="${STAR_PATH}"/></svg>`;
+    starsWrap.appendChild(star);
+    _resultsTimers.push(setTimeout(() => {
+      star.classList.add('pop');
+      if (i < earned) haptics.medium();
+    }, 550 + i * 240));
+  }
 
-  // Ring colour by tier
-  const ring = document.getElementById('results-ring-fill');
-  ring.classList.remove('tier-great', 'tier-neutral', 'tier-poor');
-  ring.classList.add(`tier-${tier}`);
+  // ── Ring colour by tier ──────────────────────────────────────
+  const ringEl = document.getElementById('results-ring-fill');
+  ringEl.classList.remove('tier-great', 'tier-neutral', 'tier-poor');
+  ringEl.classList.add(`tier-${tier}`);
 
   // Message + stats
   document.getElementById('results-message').textContent = pick(RESULT_TIERS[tier].messages);
   document.getElementById('results-stats').textContent = `${correct} / ${total} correct`;
 
+  // ── Breo's score-keyed entrance ──────────────────────────────
+  if (_resultsBreo) { _resultsBreo.destroy(); _resultsBreo = null; }
+  const breoMount = document.getElementById('results-breo');
+  _resultsBreo = createMascot({ size: 180 });
+  _resultsBreo.setMood(tier);
+  _resultsBreo.lookAt(-4, -2); // glance toward the score ring
+  breoMount.appendChild(_resultsBreo.el);
+  _resultsBreo.enter();
+  // tap Breo → a happy little burst (he's friendly)
+  breoMount.style.pointerEvents = 'auto';
+  breoMount.onclick = (e) => {
+    haptics.success();
+    burst(e.clientX, e.clientY, { count: 14, speed: 260 });
+    _resultsBreo.enter();
+  };
+
   // Tier-specific haptic
-  haptics[tier === 'great' ? 'success' : tier === 'neutral' ? 'medium' : 'error']();
+  haptics[tier === 'great' ? 'celebrate' : tier === 'neutral' ? 'medium' : 'error']();
 
   // Continue button → back to unit
   document.getElementById('results-continue-btn').onclick =
     () => navigate('unit', { unitId, unit: getUnit(unitId) });
 
-  // Confetti only on a great score
-  clearConfetti();
-  if (tier === 'great') spawnConfetti();
+  // Celebration FX
+  if (tier === 'great') {
+    _resultsTimers.push(setTimeout(() => confetti({ count: 130 }), 350));
+  } else if (tier === 'neutral') {
+    _resultsTimers.push(setTimeout(() => {
+      const r = document.querySelector('.results-ring-wrap').getBoundingClientRect();
+      burst(r.left + r.width / 2, r.top + r.height / 2, { count: 16, speed: 240 });
+    }, 750));
+  }
 
   animateScore(score);
 }
 
 const RING_CIRCUMFERENCE = 126.92; // 2π·20.2
-const reducedMotion = () =>
-  window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function animateScore(score) {
   const percentEl = document.getElementById('results-percent');
-  const ring = document.getElementById('results-ring-fill');
-  // Inline style (not setAttribute) so it overrides the stylesheet's stroke-dashoffset.
+  const ringEl = document.getElementById('results-ring-fill');
   const setRing = (v) =>
-    ring.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - v / 100));
+    ringEl.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - Math.max(0, Math.min(100, v)) / 100));
 
-  if (reducedMotion()) {
-    percentEl.textContent = `${score}%`;
-    setRing(score);
-    return;
-  }
-
-  const duration = 900;
-  const start = performance.now();
   setRing(0);
   percentEl.textContent = '0%';
 
-  function frame(now) {
-    const t = Math.min(1, (now - start) / duration);
-    const eased = 1 - Math.pow(1 - t, 3); // easeOutCubic
-    const current = Math.round(score * eased);
-    percentEl.textContent = `${current}%`;
-    setRing(score * eased);
-    if (t < 1) {
-      requestAnimationFrame(frame);
-    } else {
+  // Spring with slight overshoot — the ring swings a touch past the
+  // score, then settles. The number clamps so it never reads >100.
+  animateSpring({
+    from: 0, to: score, stiffness: 48, damping: 10.5,
+    onUpdate(v) {
+      percentEl.textContent = `${Math.round(Math.max(0, Math.min(score, v)))}%`;
+      setRing(v);
+    },
+    onComplete() {
+      percentEl.textContent = `${score}%`;
       percentEl.classList.remove('pop');
-      void percentEl.offsetWidth; // restart animation
+      void percentEl.offsetWidth;
       percentEl.classList.add('pop');
-    }
-  }
-  requestAnimationFrame(frame);
-}
-
-const CONFETTI_COLORS = ['#3fb8c8', '#4fc28b', '#e0a548', '#e07a5f', '#86d0e0'];
-
-function spawnConfetti() {
-  const layer = document.getElementById('confetti-layer');
-  const count = 28;
-  for (let i = 0; i < count; i++) {
-    const piece = document.createElement('div');
-    piece.className = 'confetti-piece';
-    piece.style.left = `${Math.random() * 100}%`;
-    piece.style.background = pick(CONFETTI_COLORS);
-    piece.style.animationDuration = `${1.6 + Math.random() * 1.4}s`;
-    piece.style.animationDelay = `${Math.random() * 0.5}s`;
-    piece.style.transform = `rotate(${Math.random() * 360}deg)`;
-    layer.appendChild(piece);
-  }
-  // Clean up after the longest possible run (duration + delay + buffer)
-  setTimeout(clearConfetti, 4000);
-}
-
-function clearConfetti() {
-  const layer = document.getElementById('confetti-layer');
-  if (layer) layer.innerHTML = '';
+    },
+  });
 }
 
 // ── Context menu (long-press on lesson dots) ───────────────────
@@ -701,7 +715,7 @@ function initLesson(unitId, lessonId) {
     return;
   }
 
-  updateProgressBar();
+  updateProgressBar(true);
   hideFeedback();
 
   const btn = document.getElementById('lesson-action-btn');
@@ -746,6 +760,37 @@ function doCheck() {
   const btn = document.getElementById('lesson-action-btn');
   btn.textContent = 'Continue';
   btn.disabled = false;
+
+  if (result.correct) {
+    // tiles burst, a green wave ripples out from the button
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-correct');
+    const r = btn.getBoundingClientRect();
+    burst(r.left + r.width / 2, r.top + r.height / 2, {
+      count: 24, speed: 380,
+      colors: ['#4fc28b', '#7ddbb0', '#4fc3d4', '#c9ecf2', '#e0a548'],
+    });
+    ripple(btn, { color: 'hsla(162, 50%, 52%, 0.45)' });
+  } else {
+    // red flash, shake, a crack through the answer
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-incorrect');
+    flash();
+    const container = document.getElementById('exercise-container');
+    const wrapper = container.querySelector('.exercise-wrapper');
+    if (wrapper) {
+      wrapper.classList.remove('wrong-shake');
+      void wrapper.offsetWidth;
+      wrapper.classList.add('wrong-shake');
+    }
+    const target =
+      container.querySelector('.mc-option.selected') ||
+      container.querySelector('.translate-textarea') ||
+      container.querySelector('.fill-blank-input') ||
+      container.querySelector('.word-bank-sentence') ||
+      wrapper;
+    crack(target);
+  }
 }
 
 function doContinue() {
@@ -753,10 +798,13 @@ function doContinue() {
   hideFeedback();
   _lessonMode = 'answering';
 
+  const btn = document.getElementById('lesson-action-btn');
+  btn.classList.remove('btn-correct', 'btn-incorrect');
+  btn.classList.add('btn-primary');
+
   if (wasNearMiss) {
     // Re-render same exercise for retry
     renderExercise();
-    const btn = document.getElementById('lesson-action-btn');
     btn.textContent = 'Check';
     btn.disabled = true;
     return;
@@ -765,16 +813,35 @@ function doContinue() {
   const hasMore = advance();
   if (hasMore) {
     updateProgressBar();
-    const btn = document.getElementById('lesson-action-btn');
     btn.textContent = 'Check';
     btn.disabled = true;
   }
 }
 
-function updateProgressBar() {
+let _progressSpringCancel = null;
+let _progressPct = 0;
+
+function updateProgressBar(reset = false) {
   const { index, total } = getProgress();
   const pct = total > 0 ? (index / total) * 100 : 0;
-  document.getElementById('lesson-progress-fill').style.width = pct + '%';
+  const fill = document.getElementById('lesson-progress-fill');
+
+  if (_progressSpringCancel) _progressSpringCancel();
+  if (reset || pct === 0 || prefersReducedMotion()) {
+    fill.classList.remove('surging');
+    fill.style.width = pct + '%';
+    _progressPct = pct;
+    return;
+  }
+
+  // spring surge with overshoot — the bar lunges past, then settles
+  fill.classList.add('surging');
+  _progressSpringCancel = animateSpring({
+    from: _progressPct, to: pct, stiffness: 160, damping: 11,
+    onUpdate(v) { fill.style.width = Math.max(0, Math.min(100, v)) + '%'; },
+    onComplete() { fill.classList.remove('surging'); },
+  });
+  _progressPct = pct;
 }
 
 function showFeedback(correct, correctAnswer, nearMiss = false) {
@@ -820,6 +887,16 @@ export async function init() {
 
   setupLoginListeners();
   setupSettingsListeners();
+
+  // Re-lay-out the path when the viewport changes (rotation, resize)
+  let _resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(() => {
+      const home = document.getElementById('screen-home');
+      if (home && !home.classList.contains('hidden')) renderHome();
+    }, 250);
+  });
 
   // Check if already logged in
   if (isLoggedIn()) {

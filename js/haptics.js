@@ -23,6 +23,7 @@ const PATTERNS = {
   error:    [0, 30, 60, 30],   // wrong answer — heavier double
   nearMiss: [0, 12, 30, 12],   // almost — gentle nudge
   complete: [0, 18, 50, 18, 50, 28], // lesson finished — celebratory
+  celebrate: [0, 16, 60, 16, 60, 16, 120, 40, 70, 60], // great score — drumroll + flourish
 };
 
 function fire(name) {
@@ -40,6 +41,7 @@ export const haptics = {
   error:    () => fire('error'),
   nearMiss: () => fire('nearMiss'),
   complete: () => fire('complete'),
+  celebrate: () => fire('celebrate'),
   setEnabled(v) { enabled = !!v; },
   get isSupported() { return supported; },
 };
@@ -53,6 +55,7 @@ export function installGlobalHaptics() {
     '.btn', '.mc-option', '.word-tile', '.matching-item',
     '.unit-card', '.lesson-dot', '.audio-btn', '.listening-speaker-btn',
     '.top-bar-btn', '.settings-btn', '.context-menu-item', '.grammar-card-header',
+    '.path-node', '.path-label',
   ].join(',');
 
   document.addEventListener('pointerdown', (e) => {
